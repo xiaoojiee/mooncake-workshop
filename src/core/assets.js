@@ -386,20 +386,35 @@ function drawNine(g, image, x, y, w, h, insetX, insetY) {
   }
 }
 
-/* 加载单张: 失败记为 missing, 不 reject */
+/* 加载单张: 失败记为 missing, 不 reject
+ * 优先同目录同名 .webp(体积小得多), 没有该文件时自动回退原图(.png)
+ * 这样美术仍只交 PNG, 打包时补一份 .webp 即可 */
 function loadOne(item) {
   return new Promise((resolve) => {
     const i = IMG[item.key];
+    const candidates = /\.png$/i.test(item.src)
+      ? [item.src.replace(/\.png$/i, '.webp'), item.src]
+      : [item.src];
+    let next = 0;
+
+    const tryNext = () => {
+      if (next >= candidates.length) {
+        ASSET_READY[item.key] = true;
+        ASSET_MISSING[item.key] = true;
+        resolve();
+        return;
+      }
+      const src = candidates[next];
+      next += 1; // 先自增: onerror 在赋值过程中同步回调也不会重复试同一个
+      i.src = src;
+    };
+
     i.onload = () => {
       ASSET_READY[item.key] = true;
       resolve();
     };
-    i.onerror = () => {
-      ASSET_READY[item.key] = true;
-      ASSET_MISSING[item.key] = true;
-      resolve();
-    };
-    i.src = item.src;
+    i.onerror = () => tryNext(); // 当前候选失败 -> 换下一个
+    tryNext();
   });
 }
 
