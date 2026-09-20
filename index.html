@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>月饼工坊</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥮</text></svg>"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        background: radial-gradient(circle at 50% 30%, #241a12, #0d0a07 75%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        /* 16:9 逻辑分辨率, 扣除刘海/安全区, 避免内容被遮挡 */
+        width: min(
+          calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)),
+          calc(177.78vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))
+        );
+        aspect-ratio: 16 / 9;
+        background: #14100c;
+        border-radius: 6px;
+        box-shadow:
+          0 0 0 1px #2a1f16,
+          0 24px 80px rgba(0, 0, 0, 0.6);
+        touch-action: none;
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" tabindex="0"></canvas>
+    <!-- B站 Toy JS SDK 由 src/core/toy.js 异步动态加载, 避免阻塞页面 -->
+    <!-- 经典 script 按依赖顺序加载(共享全局作用域), 保持无构建 -->
+    <script src="src/core/utils.js"></script>
+    <script src="src/core/config.js"></script>
+    <script src="src/core/defs.js"></script>
+    <script src="src/core/state.js"></script>
+    <script src="src/core/canvas.js"></script>
+    <script src="src/core/audio.js"></script>
+    <script src="src/core/toy.js"></script>
+    <script src="src/core/assets.js"></script>
+    <script src="src/core/atlas.js"></script>
+    <script src="src/core/input.js"></script>
+    <script src="src/fx/floattext.js"></script>
+    <script src="src/fx/steam.js"></script>
+    <script src="src/systems/factory.js"></script>
+    <script src="src/systems/save.js"></script>
+    <script src="src/systems/assembly.js"></script>
+    <script src="src/systems/order.js"></script>
+    <script src="src/ui/hud.js"></script>
+    <script src="src/ui/factoryboard.js"></script>
+    <script src="src/ui/scroll.js"></script>
+    <script src="src/ui/backpack.js"></script>
+    <script src="src/ui/benchupg.js"></script>
+    <script src="src/ui/stocking.js"></script>
+    <script src="src/ui/debug.js"></script>
+    <script src="src/scenes/scene.js"></script>
+    <script src="src/scenes/boot.js"></script>
+    <script src="src/scenes/loading.js"></script>
+    <script src="src/scenes/menu.js"></script>
+    <script src="src/scenes/shop.js"></script>
+    <script src="src/scenes/factory.js"></script>
+    <script src="src/scenes/rank.js"></script>
+    <script src="src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+node_modules
+dist
+ses_*.json
+.opencode/
+assets/*_源图/
+assets/源图/
+.DS_Store
+*.local
+*.zip
