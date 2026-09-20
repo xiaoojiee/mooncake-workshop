@@ -137,7 +137,7 @@ function benchUpgradeHandleWheel() {
 function drawBenchUpgradeWindow(g) {
   const p = benchUpgradePanelRect();
   g.save();
-  g.fillStyle = 'rgba(8,6,4,0.6)';
+  g.fillStyle = 'rgba(7,6,5,0.6)';
   g.fillRect(0, 0, W, H);
   g.restore();
 

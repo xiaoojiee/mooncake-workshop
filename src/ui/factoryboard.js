@@ -526,7 +526,7 @@ function factoryBoardDraw(g, opts) {
   /* 半透明底 */
   if (o.dim) {
     g.save();
-    g.fillStyle = 'rgba(10,8,6,0.55)';
+    g.fillStyle = 'rgba(9,8,7,0.55)';
     g.fillRect(0, 0, W, H);
     g.restore();
     uiPanel(g, FB.leftX - 8, FB.top - 12, FB.gridX + FB.gridW + FB.rightW - FB.leftX + 40, FB.bottom - FB.top + 20, {
@@ -604,7 +604,7 @@ function drawWarehouseFactories(g) {
     drawText(g, '仓库 x' + shop.factoryBag[fid] + ' · 拖到网格上场', r.x + 36, r.y + 34, {
       size: 12, color: COLORS.textDim,
     });
-    fillRoundRect(g, sr.x, sr.y, sr.w, sr.h, 5, 'rgba(208,90,78,0.85)');
+    fillRoundRect(g, sr.x, sr.y, sr.w, sr.h, 5, 'rgba(190,105,96,0.85)');
     drawText(g, '卖', sr.x + sr.w / 2, sr.y + sr.h / 2, { size: 12, align: 'center', color: COLORS.panelInk });
     g.restore();
   });
@@ -625,13 +625,13 @@ function drawWarehouseComponents(g) {
     const sr = fbWarehouseSellRect(i);
     g.save();
     g.globalAlpha = dragging ? 0.4 : 1;
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 9, 'rgba(50,32,20,0.94)');
-    strokeRoundRect(g, r.x, r.y, r.w, r.h, 9, cd.type === 'special' ? COLORS.goldLight : 'rgba(217,164,65,0.5)', 1.5);
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 9, 'rgba(46,33,24,0.94)');
+    strokeRoundRect(g, r.x, r.y, r.w, r.h, 9, cd.type === 'special' ? COLORS.goldLight : 'rgba(196,158,86,0.5)', 1.5);
     drawSprite(g, cd.icon, r.x + 6, r.y + 6, 34, 34);
     drawText(g, cd.name, r.x + 46, r.y + 16, { size: 15, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 100 });
     drawText(g, (cd.factoryId ? '专属' : '通用') + ' · ' + componentEffectText(cd) + ' · x' + shop.components[cid],
       r.x + 46, r.y + 34, { size: 12, color: cd.factoryId ? COLORS.warn : COLORS.textDim, maxWidth: r.w - 100 });
-    fillRoundRect(g, sr.x, sr.y, sr.w, sr.h, 5, cd.buyable ? 'rgba(208,90,78,0.85)' : 'rgba(80,60,45,0.7)');
+    fillRoundRect(g, sr.x, sr.y, sr.w, sr.h, 5, cd.buyable ? 'rgba(190,105,96,0.85)' : 'rgba(75,61,50,0.7)');
     drawText(g, '卖', sr.x + sr.w / 2, sr.y + sr.h / 2, { size: 12, align: 'center', color: COLORS.panelInk });
     g.restore();
   });
@@ -649,7 +649,7 @@ function drawBackpackTab(g) {
     drawText(g, group.kind === 'crust' ? '饼皮' : '馅料', FB.leftX + 16, y, { size: 14, weight: 700, color: COLORS.panelTitle });
     y += 26;
     for (const d of got) {
-      fillRoundRect(g, FB.leftX + 12, y - 15, FB.leftW - 24, 36, 8, 'rgba(229,138,36,0.16)');
+      fillRoundRect(g, FB.leftX + 12, y - 15, FB.leftW - 24, 36, 8, 'rgba(202,136,63,0.16)');
       g.fillStyle = d.color || COLORS.panelInk;
       g.beginPath();
       g.arc(FB.leftX + 28, y + 3, 10, 0, Math.PI * 2);
@@ -682,9 +682,9 @@ function drawGridBoard(g) {
     }
     const u = unitAtCell(cell);
     if (!u) {
-      fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(196,150,88,0.22)');
+      fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(181,148,103,0.22)');
       g.save();
-      g.strokeStyle = 'rgba(179,155,120,0.25)';
+      g.strokeStyle = 'rgba(171,153,128,0.25)';
       g.setLineDash([6, 6]);
       roundRect(g, r.x, r.y, r.w, r.h, 10);
       g.stroke();
@@ -699,7 +699,7 @@ function drawCoreCell(g, r, used, cap) {
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2;
   const full = used >= cap;
-  fillRoundRect(g, r.x, r.y, r.w, r.h, 12, 'rgba(217,164,65,0.18)');
+  fillRoundRect(g, r.x, r.y, r.w, r.h, 12, 'rgba(196,158,86,0.18)');
   strokeRoundRect(g, r.x, r.y, r.w, r.h, 12, full ? COLORS.warn : COLORS.goldLight, 2.5);
   g.save();
   g.globalAlpha = 0.25 + (Math.sin(performance.now() / 500) + 1) / 4;
@@ -720,8 +720,8 @@ function drawUnitCard(g, u, r, on, sel) {
   const dragging = factoryBoard.drag && factoryBoard.drag.kind === 'unit' && factoryBoard.drag.uid === u.uid;
   g.save();
   g.globalAlpha = dragging ? 0.4 : 1;
-  fillRoundRect(g, r.x, r.y, r.w, r.h, 10, on ? '#fbe7c2' : '#f3ddb4');
-  strokeRoundRect(g, r.x, r.y, r.w, r.h, 10, sel ? COLORS.goldLight : on ? COLORS.ok : 'rgba(179,155,120,0.5)', sel ? 3 : 2);
+  fillRoundRect(g, r.x, r.y, r.w, r.h, 10, on ? '#f3e5ca' : '#eadabd');
+  strokeRoundRect(g, r.x, r.y, r.w, r.h, 10, sel ? COLORS.goldLight : on ? COLORS.ok : 'rgba(171,153,128,0.5)', sel ? 3 : 2);
 
   drawProductDot(g, r.x + 14, r.y + 14, def);
   drawText(g, def ? def.name : u.factoryId, r.x + 26, r.y + 14, {
@@ -736,8 +736,8 @@ function drawUnitCard(g, u, r, on, sel) {
   for (let i = 0; i < total; i++) {
     const sx = startX + i * (sw + gp);
     const sy = r.y + 30;
-    fillRoundRect(g, sx, sy, sw, sw, 4, u.slots[i] ? 'rgba(217,164,65,0.9)' : 'rgba(160,110,60,0.28)');
-    strokeRoundRect(g, sx, sy, sw, sw, 4, u.slots[i] ? COLORS.goldLight : 'rgba(179,155,120,0.4)', 1);
+    fillRoundRect(g, sx, sy, sw, sw, 4, u.slots[i] ? 'rgba(196,158,86,0.9)' : 'rgba(146,110,74,0.28)');
+    strokeRoundRect(g, sx, sy, sw, sw, 4, u.slots[i] ? COLORS.goldLight : 'rgba(171,153,128,0.4)', 1);
   }
 
   /* 进度条(吸料塔显示自动吸料) */
@@ -746,12 +746,12 @@ function drawUnitCard(g, u, r, on, sel) {
   const barW = r.w - 16;
   const isUtil = def && def.kind === 'util';
   if (isUtil) {
-    uiBarMini(g, barX, barY, barW, 8, on ? 1 : 0, on ? COLORS.icy : 'rgba(179,155,120,0.5)');
+    uiBarMini(g, barX, barY, barW, 8, on ? 1 : 0, on ? COLORS.icy : 'rgba(171,153,128,0.5)');
     drawText(g, on ? '自动吸料中' : '断电', r.x + 8, barY - 8, {
       size: 11, color: on ? COLORS.icy : COLORS.fail,
     });
   } else {
-    uiBarMini(g, barX, barY, barW, 8, u.progress || 0, on ? COLORS.ok : 'rgba(179,155,120,0.5)');
+    uiBarMini(g, barX, barY, barW, 8, u.progress || 0, on ? COLORS.ok : 'rgba(171,153,128,0.5)');
     const pct = Math.floor((u.progress || 0) * 100);
     drawText(g, on ? '生产 ' + pct + '%' : '断电', r.x + 8, barY - 8, {
       size: 11, color: on ? COLORS.textDim : COLORS.fail,
@@ -797,7 +797,7 @@ function drawRightDetail(g) {
       if (slot) {
         const cd = findComponentDef(slot.compId);
         const top = cd && cd.upgradable && slot.level < cd.maxLevel;
-        fillRoundRect(g, r.x, r.y, r.w, r.h, 9, 'rgba(60,40,24,0.95)');
+        fillRoundRect(g, r.x, r.y, r.w, r.h, 9, 'rgba(55,41,29,0.95)');
         strokeRoundRect(g, r.x, r.y, r.w, r.h, 9, cd && cd.type === 'special' ? COLORS.goldLight : COLORS.gold, 2);
         drawSprite(g, cd ? cd.icon : 'icon_unlock', r.x + 8, r.y + 10, 36, 36);
         drawText(g, cd ? cd.name : '?', r.x + 50, r.y + 22, { size: 12, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 58 });
@@ -810,7 +810,7 @@ function drawRightDetail(g) {
       } else {
         fillRoundRect(g, r.x, r.y, r.w, r.h, 9, COLORS.panelInner);
         g.save();
-        g.strokeStyle = 'rgba(179,155,120,0.4)';
+        g.strokeStyle = 'rgba(171,153,128,0.4)';
         g.setLineDash([6, 6]);
         roundRect(g, r.x, r.y, r.w, r.h, 9);
         g.stroke();
@@ -872,7 +872,7 @@ function fbShopRows() {
 function drawShopModal(g) {
   const p = fbShopRect();
   g.save();
-  g.fillStyle = 'rgba(8,6,4,0.55)';
+  g.fillStyle = 'rgba(7,6,5,0.55)';
   g.fillRect(0, 0, W, H);
   g.restore();
   uiPanel(g, p.x, p.y, p.w, p.h, { r: 18, color: COLORS.panelDark });
@@ -980,7 +980,7 @@ function drawBoardGhost(g) {
 
 /* ---- 小工具 ---- */
 function uiBarMini(g, x, y, w, h, ratio, color) {
-  fillRoundRect(g, x, y, w, h, h / 2, 'rgba(20,16,12,0.8)');
+  fillRoundRect(g, x, y, w, h, h / 2, 'rgba(19,16,13,0.8)');
   const r = clamp(ratio, 0, 1);
   if (r > 0) fillRoundRect(g, x, y, Math.max(h, w * r), h, h / 2, color);
 }
@@ -1014,5 +1014,5 @@ function drawScrollBar(g, area, scroll, maxScroll) {
   const trackH = area.h;
   const barH = Math.max(40, trackH * (trackH / (trackH + maxScroll)));
   const y = area.y + (trackH - barH) * (scroll / maxScroll);
-  fillRoundRect(g, area.x + area.w - 8, y, 6, barH, 3, 'rgba(217,164,65,0.5)');
+  fillRoundRect(g, area.x + area.w - 8, y, 6, barH, 3, 'rgba(196,158,86,0.5)');
 }

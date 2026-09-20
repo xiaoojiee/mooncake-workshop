@@ -18,31 +18,31 @@ let ICON_SCALE = 1.18; // 图标放大系数(以中心缩放, 不改变布局坐
  *   浅色面板 = 奶油底 + 深棕字(ink / inkDim)
  *   橙色按钮/表头 = 橙底 + 奶油字(cream / goldLight) */
 const COLORS = {
-  bg: '#b45f14',
-  bgWarm: '#f2a23e', // 背景暖橙
-  bgWarmDeep: '#d9761c', // 背景深橙
-  panel: '#fdf1d8', // 面板奶油底
-  panelLight: '#fff9ec', // 悬停/浅面板
-  panelDark: '#f7e3b8', // 外层大面板
-  panelInner: '#fbe7c2', // 面板里的凹槽/内层
-  panelBorder: '#e58a24', // 面板包边(琥珀橙)
-  panelInk: '#6d3a12', // 浅面板上的主文字
-  panelInkDim: '#9c6a33', // 浅面板上的次要文字
-  panelTitle: '#b8620f', // 浅面板上的小标题(深琥珀)
-  gold: '#e59a1f',
-  goldLight: '#ffd166',
-  cream: '#fff6e2', // 深色/橙底上的文字
-  creamDim: '#ffe6b0', // 深色/橙底上的次要文字
-  text: '#6d3a12',
-  textDim: '#9c6a33',
-  ok: '#63a83c',
-  warn: '#e08a1e',
-  fail: '#cf4a2e',
-  lotus: '#c98a4b',
-  bean: '#7b3f2e',
-  custard: '#e8b33a',
-  crust: '#e0a45c',
-  icy: '#bcd9e8',
+  bg: '#9e602a',
+  bgWarm: '#d99f57', // 背景暖橙
+  bgWarmDeep: '#bf7736', // 背景深橙
+  panel: '#f8efdd', // 面板奶油底
+  panelLight: '#fcf8ef', // 悬停/浅面板
+  panelDark: '#eee0c1', // 外层大面板
+  panelInner: '#f3e5ca', // 面板里的凹槽/内层
+  panelBorder: '#ca883f', // 面板包边(琥珀橙)
+  panelInk: '#603c1f', // 浅面板上的主文字
+  panelInkDim: '#8d6942', // 浅面板上的次要文字
+  panelTitle: '#a06227', // 浅面板上的小标题(深琥珀)
+  gold: '#c9933b',
+  goldLight: '#eac87b',
+  cream: '#fbf4e6', // 深色/橙底上的文字
+  creamDim: '#f4e2bb', // 深色/橙底上的次要文字
+  text: '#603c1f',
+  textDim: '#8d6942',
+  ok: '#67994b',
+  warn: '#c58739',
+  fail: '#b85945',
+  lotus: '#b78a5d',
+  bean: '#704539',
+  custard: '#d0a952',
+  crust: '#cea26e',
+  icy: '#c2d7e2',
 };
 
 /* ---- 操作台尺寸(逻辑坐标) ---- */

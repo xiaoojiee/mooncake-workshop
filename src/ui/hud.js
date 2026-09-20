@@ -19,22 +19,22 @@ function panelBody(g, x, y, w, h, base) {
 function buttonBody(g, x, y, w, h, active) {
   const grd = g.createLinearGradient(x, y, x, y + h);
   if (active) {
-    grd.addColorStop(0, '#ffd071');
-    grd.addColorStop(0.5, '#f6a52f');
-    grd.addColorStop(1, '#dd7d13');
+    grd.addColorStop(0, '#ebc985');
+    grd.addColorStop(0.5, '#daa04b');
+    grd.addColorStop(1, '#c17c2f');
   } else {
-    grd.addColorStop(0, '#ffc766');
-    grd.addColorStop(0.5, '#f0a03c');
-    grd.addColorStop(1, '#d97f21');
+    grd.addColorStop(0, '#eac17b');
+    grd.addColorStop(0.5, '#d79d55');
+    grd.addColorStop(1, '#bf7e3b');
   }
   return grd;
 }
 /* 包边: 上亮金 → 下深橙(琥珀) */
 function metalBorder(g, x, y, w, h) {
   const grd = g.createLinearGradient(x, y, x, y + h);
-  grd.addColorStop(0, '#ffd27a');
+  grd.addColorStop(0, '#eccc8d');
   grd.addColorStop(0.45, COLORS.panelBorder);
-  grd.addColorStop(1, '#c2650d');
+  grd.addColorStop(1, '#a96626');
   return grd;
 }
 /* 粗包边(外圈深色刻画线 + 内圈细高光), 卡通描边风 */
@@ -42,12 +42,12 @@ function strokeMetal(g, x, y, w, h, r, width) {
   const bw = width || 5;
   g.save();
   g.globalAlpha = 0.22; // 外圈深色刻画线, 拉开层次
-  strokeRoundRect(g, x - 1.5, y - 1.5, w + 3, h + 3, r + 1.5, '#6d3a12', bw * 0.7);
+  strokeRoundRect(g, x - 1.5, y - 1.5, w + 3, h + 3, r + 1.5, '#603c1f', bw * 0.7);
   g.restore();
   strokeRoundRect(g, x, y, w, h, r, metalBorder(g, x, y, w, h), bw);
   g.save();
   g.globalAlpha = 0.7; // 内圈细白高光
-  g.strokeStyle = '#fffdf2';
+  g.strokeStyle = '#fdfcf4';
   g.lineWidth = 1.6;
   roundRect(g, x + bw * 0.72, y + bw * 0.72, w - bw * 1.44, h - bw * 1.44, Math.max(2, r - bw * 0.72));
   g.stroke();
@@ -74,7 +74,7 @@ function uiButton(g, b) {
 
   /* 按钮: 橙色渐变 + 顶部高光带 + 粗包边(悬停/按下更亮) */
   const rr = b.r || 14;
-  fillRoundRect(g, x, y + 5, b.w, b.h, rr, 'rgba(109,58,18,0.32)');
+  fillRoundRect(g, x, y + 5, b.w, b.h, rr, 'rgba(96,60,31,0.32)');
   fillRoundRect(g, x, y, b.w, b.h, rr, buttonBody(g, x, y, b.w, b.h, (hover || pressed) && !disabled));
   g.save();
   g.globalAlpha = 0.4;
@@ -86,7 +86,7 @@ function uiButton(g, b) {
   /* 文字: 奶油字 + 深橙描边(卡通感) */
   const cx = x + b.w / 2;
   const cy = y + b.h / 2;
-  const outline = '#a35c12';
+  const outline = '#8f5c26';
   if (b.sublabel) {
     drawText(g, b.label, cx, cy - 10, {
       size: b.size || 20, weight: 700, align: 'center',
@@ -134,7 +134,7 @@ function uiPanel(g, x, y, w, h, opts) {
   const r = o.r || 18;
   g.save();
   if (o.shadow !== false) {
-    g.shadowColor = 'rgba(90,45,10,0.35)';
+    g.shadowColor = 'rgba(79,46,21,0.35)';
     g.shadowBlur = 16;
     g.shadowOffsetY = 5;
   }
@@ -155,7 +155,7 @@ function uiPanel(g, x, y, w, h, opts) {
 
 /* 进度条 */
 function uiBar(g, x, y, w, h, ratio, color, bg) {
-  fillRoundRect(g, x, y, w, h, h / 2, bg || 'rgba(20,16,12,0.75)');
+  fillRoundRect(g, x, y, w, h, h / 2, bg || 'rgba(19,16,13,0.75)');
   const r = clamp(ratio, 0, 1);
   if (r > 0) fillRoundRect(g, x, y, Math.max(h, w * r), h, h / 2, color || COLORS.gold);
 }
@@ -166,34 +166,34 @@ function uiHeader(g, opts) {
   g.save();
   /* 暖橙横条 + 底部亮边(压在背景上, 卡通感) */
   const bar = g.createLinearGradient(0, 0, 0, LAYOUT.headerH);
-  bar.addColorStop(0, '#f2a641');
-  bar.addColorStop(1, '#dd7d13');
+  bar.addColorStop(0, '#d9a35a');
+  bar.addColorStop(1, '#c17c2f');
   g.fillStyle = bar;
   g.fillRect(0, 0, W, LAYOUT.headerH);
-  g.fillStyle = 'rgba(109,58,18,0.7)';
+  g.fillStyle = 'rgba(96,60,31,0.7)';
   g.fillRect(0, 0, W, 3);
-  g.fillStyle = 'rgba(255,226,160,0.85)';
+  g.fillStyle = 'rgba(242,221,173,0.85)';
   g.fillRect(0, LAYOUT.headerH - 4, W, 4);
-  g.fillStyle = 'rgba(109,58,18,0.25)';
+  g.fillStyle = 'rgba(96,60,31,0.25)';
   g.fillRect(0, LAYOUT.headerH - 7, W, 3);
 
   /* 左侧留给全局背包 / 调试按钮 */
   drawText(g, o.title || '月饼工坊', 248, LAYOUT.headerH / 2, {
-    size: 30, weight: 700, color: COLORS.cream, stroke: '#a35c12', strokeWidth: 4,
+    size: 30, weight: 700, color: COLORS.cream, stroke: '#8f5c26', strokeWidth: 4,
   });
 
   /* 金币 */
   const rx = W - 28;
   drawSprite(g, 'ui_coin', rx - 200, LAYOUT.headerH / 2 - 17, 34, 34);
   drawText(g, formatNum(shop.coins), rx - 155, LAYOUT.headerH / 2, {
-    size: 24, weight: 700, color: COLORS.cream, stroke: '#a35c12', strokeWidth: 3.5,
+    size: 24, weight: 700, color: COLORS.cream, stroke: '#8f5c26', strokeWidth: 3.5,
   });
   drawText(g, '第 ' + shop.day + ' 天', rx - 20, LAYOUT.headerH / 2 - 12, {
     size: 18,
     weight: 700,
     align: 'right',
     color: COLORS.cream,
-    stroke: '#a35c12',
+    stroke: '#8f5c26',
     strokeWidth: 3,
   });
   drawText(g, '口碑 ' + shop.reputation, rx - 20, LAYOUT.headerH / 2 + 14, {
@@ -201,7 +201,7 @@ function uiHeader(g, opts) {
     weight: 600,
     align: 'right',
     color: COLORS.creamDim,
-    stroke: '#a35c12',
+    stroke: '#8f5c26',
     strokeWidth: 2.5,
   });
   g.restore();
@@ -223,14 +223,14 @@ function drawFallbackBg(g) {
   /* 暖橙底, 和奶油面板/橙色按钮统一 */
   const bg = g.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, COLORS.bgWarm);
-  bg.addColorStop(0.55, '#eb9430');
+  bg.addColorStop(0.55, '#d1924a');
   bg.addColorStop(1, COLORS.bgWarmDeep);
   g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
   /* 中上方金色光晕 */
   const grd = g.createRadialGradient(W / 2, H * 0.32, 40, W / 2, H * 0.32, H * 0.95);
-  grd.addColorStop(0, 'rgba(255,232,170,0.42)');
-  grd.addColorStop(1, 'rgba(255,232,170,0)');
+  grd.addColorStop(0, 'rgba(243,227,182,0.42)');
+  grd.addColorStop(1, 'rgba(243,227,182,0)');
   g.fillStyle = grd;
   g.fillRect(0, 0, W, H);
 }
@@ -252,5 +252,5 @@ function drawBg(g, key) {
     return;
   }
   drawFallbackBg(g);
-  drawText(g, key, W - 20, H - 16, { size: 13, align: 'right', color: 'rgba(179,155,120,0.4)' });
+  drawText(g, key, W - 20, H - 16, { size: 13, align: 'right', color: 'rgba(171,153,128,0.4)' });
 }

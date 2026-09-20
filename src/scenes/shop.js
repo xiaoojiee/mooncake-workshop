@@ -890,7 +890,7 @@ function drawCounter(g) {
     /* 先垫一层木色底铺到画面底, 免得下半部分(制作台下方)露出背景图 */
     const back = g.createLinearGradient(0, surfaceTop - 8, 0, H);
     back.addColorStop(0, COLORS.panelDark);
-    back.addColorStop(1, '#3a1c10');
+    back.addColorStop(1, '#341f16');
     g.fillStyle = back;
     g.fillRect(0, surfaceTop - 8, W, H - (surfaceTop - 8));
     g.drawImage(cimg, x, surfaceTop - 8, w, h);
@@ -899,7 +899,7 @@ function drawCounter(g) {
   }
 
   g.save();
-  /* 台面(#9a4d2e -> #793b23, 和面板同色系) */
+  /* 台面(#8b533d -> #6d402f, 和面板同色系) */
   const grd = g.createLinearGradient(0, surfaceTop, 0, edge);
   grd.addColorStop(0, COLORS.panelLight);
   grd.addColorStop(1, COLORS.panel);
@@ -907,15 +907,15 @@ function drawCounter(g) {
   g.fillRect(0, surfaceTop, W, edge - surfaceTop);
   /* 前沿金色包边(金属反光) */
   const edgeGrd = g.createLinearGradient(0, edge, W, edge);
-  edgeGrd.addColorStop(0, '#ffe9a8');
+  edgeGrd.addColorStop(0, '#f3e3b4');
   edgeGrd.addColorStop(0.5, COLORS.panelBorder);
-  edgeGrd.addColorStop(1, '#b8860b');
+  edgeGrd.addColorStop(1, '#a07c23');
   g.fillStyle = edgeGrd;
   g.fillRect(0, edge, W, 4);
-  /* 柜台前沿立面(#5c2c1a -> #3a1c10) */
+  /* 柜台前沿立面(#533023 -> #341f16) */
   const grd2 = g.createLinearGradient(0, edge + 4, 0, slabBot);
   grd2.addColorStop(0, COLORS.panelDark);
-  grd2.addColorStop(1, '#3a1c10');
+  grd2.addColorStop(1, '#341f16');
   g.fillStyle = grd2;
   g.fillRect(0, edge + 4, W, slabBot - edge - 4);
   g.restore();
@@ -963,12 +963,12 @@ function drawCustomerFigure(g, c, cx, baseY, h) {
   const headY = baseY - h + headR;
   const special = c.def.kind === 'special';
   g.save();
-  fillRoundRect(g, cx - h * 0.26, headY + headR * 0.6, h * 0.52, h, h * 0.16, special ? 'rgba(217,164,65,0.35)' : 'rgba(74,47,27,0.95)');
+  fillRoundRect(g, cx - h * 0.26, headY + headR * 0.6, h * 0.52, h, h * 0.16, special ? 'rgba(196,158,86,0.35)' : 'rgba(67,48,34,0.95)');
   g.beginPath();
   g.arc(cx, headY, headR, 0, Math.PI * 2);
   g.fillStyle = special ? COLORS.gold : COLORS.panelLight;
   g.fill();
-  g.strokeStyle = special ? COLORS.goldLight : 'rgba(217,164,65,0.5)';
+  g.strokeStyle = special ? COLORS.goldLight : 'rgba(196,158,86,0.5)';
   g.lineWidth = special ? 3 : 2;
   g.stroke();
   g.restore();
@@ -986,11 +986,11 @@ function drawCustomerFigure(g, c, cx, baseY, h) {
 function drawOrderBubble(g, c, x, y, w) {
   const h = 116;
   const special = c.def.kind === 'special';
-  const bg = special ? 'rgba(80,52,20,0.94)' : 'rgba(38,24,15,0.94)';
+  const bg = special ? 'rgba(72,51,28,0.94)' : 'rgba(35,25,18,0.94)';
   uiPanel(g, x, y, w, h, {
     r: 12,
     color: bg,
-    borderColor: special ? COLORS.goldLight : 'rgba(217,164,65,0.5)',
+    borderColor: special ? COLORS.goldLight : 'rgba(196,158,86,0.5)',
     shadow: false,
   });
 
@@ -1101,7 +1101,7 @@ function drawMoney(g) {
       g.strokeStyle = COLORS.goldLight;
       g.lineWidth = 2;
       g.stroke();
-      drawText(g, '¥', m.x, m.y, { size: 15, weight: 700, align: 'center', color: '#5a3a12' });
+      drawText(g, '¥', m.x, m.y, { size: 15, weight: 700, align: 'center', color: '#50391c' });
     }
     g.restore();
   }
@@ -1185,7 +1185,7 @@ function drawCart(g) {
   g.ellipse(0, 16, 26, 7, 0, 0, Math.PI * 2);
   g.fill();
   /* 轮子 */
-  g.fillStyle = '#241509';
+  g.fillStyle = '#20150d';
   g.beginPath();
   g.arc(-13, 7, 6, 0, Math.PI * 2);
   g.fill();
@@ -1193,8 +1193,8 @@ function drawCart(g) {
   g.arc(13, 7, 6, 0, Math.PI * 2);
   g.fill();
   /* 车身 */
-  fillRoundRect(g, -24, -24, 48, 30, 8, '#8a5a32');
-  fillRoundRect(g, -20, -20, 40, 12, 5, '#c98a4b');
+  fillRoundRect(g, -24, -24, 48, 30, 8, '#7e5b3e');
+  fillRoundRect(g, -20, -20, 40, 12, 5, '#b78a5d');
   /* 车上的硬币堆 */
   for (let i = 0; i < 3; i++) {
     const cx = -8 + i * 8;
@@ -1279,7 +1279,7 @@ function drawHotbar(g) {
 
     g.save();
     g.globalAlpha = empty ? 0.45 : 1;
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, empty ? '#efdcb8' : COLORS.panelLight);
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, empty ? '#e7dac0' : COLORS.panelLight);
 
     let drew = false;
     if (it.kind === 'crust') drew = drawCrustPart(g, def.col, 'raw', r.x + 8, cy - 22, 44, 44);
@@ -1306,8 +1306,8 @@ function drawHotbar(g) {
 
   const thumb = hotbarBarThumb();
   if (thumb) {
-    fillRoundRect(g, a.x + a.w - 8, a.y, 8, a.h, 4, 'rgba(20,16,12,0.5)');
-    fillRoundRect(g, thumb.x, thumb.y, thumb.w, thumb.h, 4, 'rgba(217,164,65,0.75)');
+    fillRoundRect(g, a.x + a.w - 8, a.y, 8, a.h, 4, 'rgba(19,16,13,0.5)');
+    fillRoundRect(g, thumb.x, thumb.y, thumb.w, thumb.h, 4, 'rgba(196,158,86,0.75)');
   }
 }
 
@@ -1322,7 +1322,7 @@ function drawBench(g) {
     const cx = r.x + r.w / 2;
     const cy = r.y + r.h / 2 + 10;
 
-    fillRoundRect(g, r.x + 6, r.y + 40, r.w - 12, r.h - 52, 12, 'rgba(196,150,88,0.22)');
+    fillRoundRect(g, r.x + 6, r.y + 40, r.w - 12, r.h - 52, 12, 'rgba(181,148,103,0.22)');
     drawSlotMoon(g, slot, cx, cy, 64);
 
     /* 层数/完成度提示 */
@@ -1356,8 +1356,8 @@ function drawOven(g) {
 
     const done = ovenDone(os);
     const burnt = ovenBurnt(os);
-    const border = burnt ? COLORS.fail : done ? COLORS.ok : os.state === 'baking' ? COLORS.warn : 'rgba(217,164,65,0.3)';
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, '#f4e0b8');
+    const border = burnt ? COLORS.fail : done ? COLORS.ok : os.state === 'baking' ? COLORS.warn : 'rgba(196,158,86,0.3)';
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, '#ecddc0');
     strokeRoundRect(g, r.x, r.y, r.w, r.h, 10, border, 2);
 
     if (os.state === 'baking' && os.moon) {
@@ -1393,8 +1393,8 @@ function drawOven(g) {
   if (maxS > 0) {
     const thumbH = Math.max(28, area.h * (area.h / ovenContentH()));
     const ty = area.y + (area.h - thumbH) * ((game.ovenScroll || 0) / maxS);
-    fillRoundRect(g, area.x + area.w - 7, area.y, 7, area.h, 4, 'rgba(20,16,12,0.5)');
-    fillRoundRect(g, area.x + area.w - 7, ty, 7, thumbH, 4, 'rgba(217,164,65,0.75)');
+    fillRoundRect(g, area.x + area.w - 7, area.y, 7, area.h, 4, 'rgba(19,16,13,0.5)');
+    fillRoundRect(g, area.x + area.w - 7, ty, 7, thumbH, 4, 'rgba(196,158,86,0.75)');
   }
 }
 
@@ -1512,7 +1512,7 @@ function drawFactoryPanel(g) {
   const py = p.y;
 
   g.save();
-  g.fillStyle = 'rgba(10,8,6,0.4)';
+  g.fillStyle = 'rgba(9,8,7,0.4)';
   g.fillRect(0, 0, W, H);
   g.restore();
 
@@ -1555,7 +1555,7 @@ function drawFactoryList(g) {
   if (crustCount < ids.length) {
     const fr0 = factoryListItemRect(crustCount);
     drawText(g, '馅料', p.x + 20, fr0.y - 9, { size: 11, weight: 700, color: COLORS.panelTitle });
-    g.strokeStyle = 'rgba(217,164,65,0.25)';
+    g.strokeStyle = 'rgba(196,158,86,0.25)';
     g.lineWidth = 1;
     g.beginPath();
     g.moveTo(p.x + 20, fr0.y - 16);
@@ -1574,7 +1574,7 @@ function drawFactoryList(g) {
     const r = factoryListItemRect(i);
     const active = uid === sel;
 
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, active ? 'rgba(217,164,65,0.22)' : COLORS.panelInner);
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, active ? 'rgba(196,158,86,0.22)' : COLORS.panelInner);
     if (active) strokeRoundRect(g, r.x, r.y, r.w, r.h, 8, COLORS.gold, 2);
 
     g.fillStyle = product ? product.color : COLORS.panelInk;
@@ -1630,7 +1630,7 @@ function drawSelectedFactory(g) {
     const r = slotBoxRect(i);
     if (slot) {
       const cd = findComponentDef(slot.compId);
-      fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(60,40,24,0.95)');
+      fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(55,41,29,0.95)');
       strokeRoundRect(g, r.x, r.y, r.w, r.h, 10, cd && cd.type === 'special' ? COLORS.goldLight : COLORS.gold, 2);
       drawSprite(g, cd ? cd.icon : 'icon_unlock', r.x + r.w / 2 - 18, r.y + 10, 36, 36);
       drawText(g, cd ? cd.name : '?', r.x + r.w / 2, r.y + 58, { size: 12, weight: 600, align: 'center', color: COLORS.panelInk });
@@ -1638,7 +1638,7 @@ function drawSelectedFactory(g) {
     } else {
       fillRoundRect(g, r.x, r.y, r.w, r.h, 10, COLORS.panelInner);
       g.save();
-      g.strokeStyle = 'rgba(179,155,120,0.45)';
+      g.strokeStyle = 'rgba(171,153,128,0.45)';
       g.setLineDash([6, 6]);
       roundRect(g, r.x, r.y, r.w, r.h, 10);
       g.stroke();
@@ -1738,8 +1738,8 @@ function drawComponentBag(g) {
     const dragging = game.drag && game.drag.kind === DRAG.COMPONENT && game.drag.compId === compId;
     g.save();
     g.globalAlpha = dragging ? 0.4 : 1;
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, 'rgba(50,32,20,0.9)');
-    strokeRoundRect(g, r.x, r.y, r.w, r.h, 8, cd.type === 'special' ? COLORS.goldLight : 'rgba(217,164,65,0.4)', 1.5);
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, 'rgba(46,33,24,0.9)');
+    strokeRoundRect(g, r.x, r.y, r.w, r.h, 8, cd.type === 'special' ? COLORS.goldLight : 'rgba(196,158,86,0.4)', 1.5);
     drawSprite(g, cd.icon, r.x + 6, r.y + 8, 34, 34);
     drawText(g, cd.name, r.x + 46, r.y + 18, { size: 11, weight: 600, color: COLORS.panelInk, maxWidth: 80 });
     if (cd.factoryId) {
@@ -1760,7 +1760,7 @@ function drawComponentBag(g) {
   buyable.forEach((cd, i) => {
     const r = buyCompRect(i);
     const afford = shop.coins >= cd.cost;
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, afford ? 'rgba(60,40,24,0.9)' : '#f0dcbc');
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, afford ? 'rgba(55,41,29,0.9)' : '#e9dac3');
     drawText(g, cd.name, r.x + 10, r.y + r.h / 2, { size: 12, weight: 600, color: COLORS.panelInk });
     drawText(g, '💰' + cd.cost, r.x + r.w - 10, r.y + r.h / 2, {
       size: 12, weight: 600, align: 'right', color: afford ? COLORS.gold : COLORS.fail,
@@ -1899,7 +1899,7 @@ function dayEndButtonRect() {
 /* ---- 日终结算 ---- */
 function drawDayEnd(g) {
   g.save();
-  g.fillStyle = 'rgba(10,8,6,0.8)';
+  g.fillStyle = 'rgba(9,8,7,0.8)';
   g.fillRect(0, 0, W, H);
   g.restore();
 

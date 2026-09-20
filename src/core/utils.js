@@ -69,7 +69,7 @@ function drawText(ctx, text, x, y, opts) {
   const o = opts || {};
   ctx.save();
   if (o.size) setFont(ctx, o.size, o.weight);
-  ctx.fillStyle = o.color || '#6d3a12';
+  ctx.fillStyle = o.color || '#603c1f';
   ctx.textAlign = o.align || 'left';
   ctx.textBaseline = o.baseline || 'middle';
   if (o.shadow) {
@@ -96,7 +96,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, opts) {
   if (o.size) setFont(ctx, o.size, o.weight);
   ctx.textAlign = o.align || 'left';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = o.color || '#6d3a12';
+  ctx.fillStyle = o.color || '#603c1f';
   const lh = lineHeight * (UI_SCALE || 1);
   let line = '';
   let cy = y;

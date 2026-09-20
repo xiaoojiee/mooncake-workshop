@@ -143,7 +143,7 @@ function stockingConfirm() {
 function drawStockingWindow(g) {
   const p = stockingPanelRect();
   g.save();
-  g.fillStyle = 'rgba(8,6,4,0.62)';
+  g.fillStyle = 'rgba(7,6,5,0.62)';
   g.fillRect(0, 0, W, H);
   g.restore();
 

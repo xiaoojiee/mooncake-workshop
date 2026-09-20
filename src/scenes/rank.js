@@ -64,8 +64,8 @@ scenes.register(
         const sel = rankState.board === t.board;
         uiPanel(ctx, tx + 6, tabY, tabW - 12, 56, {
           r: 12,
-          color: sel ? 'rgba(217,164,65,0.25)' : COLORS.panelInner,
-          borderColor: sel ? COLORS.gold : 'rgba(217,164,65,0.3)',
+          color: sel ? 'rgba(196,158,86,0.25)' : COLORS.panelInner,
+          borderColor: sel ? COLORS.gold : 'rgba(196,158,86,0.3)',
           shadow: false,
         });
         drawText(ctx, t.label, tx + tabW / 2, tabY + 28, {
@@ -87,7 +87,7 @@ scenes.register(
       drawText(ctx, '名次', lx + 30, ly + 34, { size: 14, color: COLORS.textDim });
       drawText(ctx, '玩家', lx + 120, ly + 34, { size: 14, color: COLORS.textDim });
       drawText(ctx, '成绩', lx + lw - 30, ly + 34, { size: 14, align: 'right', color: COLORS.textDim });
-      ctx.strokeStyle = 'rgba(217,164,65,0.25)';
+      ctx.strokeStyle = 'rgba(196,158,86,0.25)';
       ctx.beginPath();
       ctx.moveTo(lx + 20, ly + 54);
       ctx.lineTo(lx + lw - 20, ly + 54);
@@ -107,7 +107,7 @@ scenes.register(
         rankState.list.slice(0, 12).forEach((it, i) => {
           const ry = ly + 76 + i * 28;
           const mine = rankState.my && rankState.my.rank === it.rank && it.nickname === (rankState.my.nickname || it.nickname);
-          if (mine) fillRoundRect(ctx, lx + 12, ry - 13, lw - 24, 26, 8, 'rgba(217,164,65,0.15)');
+          if (mine) fillRoundRect(ctx, lx + 12, ry - 13, lw - 24, 26, 8, 'rgba(196,158,86,0.15)');
           const medal = ['🥇', '🥈', '🥉'][it.rank - 1] || String(it.rank);
           drawText(ctx, medal, lx + 44, ry, { size: 16, weight: 700, align: 'center', color: COLORS.panelInk });
           drawText(ctx, it.nickname || '匿名', lx + 120, ry, { size: 16, color: COLORS.panelInk });

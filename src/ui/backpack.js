@@ -191,7 +191,7 @@ function drawBackpackButton(g) {
 function drawBackpackWindow(g) {
   const p = backpackWindowRect();
   g.save();
-  g.fillStyle = 'rgba(8,6,4,0.35)';
+  g.fillStyle = 'rgba(7,6,5,0.35)';
   g.fillRect(0, 0, W, H);
   g.restore();
 
@@ -255,8 +255,8 @@ function drawBackpackWindow(g) {
     const trackH = area.h;
     const thumbH = Math.max(30, trackH * (area.h / backpackContentH()));
     const ty = area.y + (trackH - thumbH) * (backpackUI.scroll / maxS);
-    fillRoundRect(g, area.x + area.w - 6, area.y, 6, trackH, 3, 'rgba(20,16,12,0.5)');
-    fillRoundRect(g, area.x + area.w - 6, ty, 6, thumbH, 3, 'rgba(217,164,65,0.75)');
+    fillRoundRect(g, area.x + area.w - 6, area.y, 6, trackH, 3, 'rgba(19,16,13,0.5)');
+    fillRoundRect(g, area.x + area.w - 6, ty, 6, thumbH, 3, 'rgba(196,158,86,0.75)');
   }
 
   /* 拖拽跟随 */

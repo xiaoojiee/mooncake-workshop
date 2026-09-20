@@ -194,7 +194,7 @@ function drawFlipSign(g) {
 
   /* 吊绳: 放在翻转变换里, 跟着牌子一起翻 */
   g.save();
-  g.strokeStyle = 'rgba(217,164,65,0.75)';
+  g.strokeStyle = 'rgba(196,158,86,0.75)';
   g.lineWidth = 4;
   g.beginPath();
   g.moveTo(cx - SIGN.w / 2 + 40, 70);
@@ -211,11 +211,11 @@ function drawFlipSign(g) {
   g.shadowOffsetY = 8;
   fillRoundRect(g, r.x, r.y, r.w, r.h, 16, open ? COLORS.panelBorder : COLORS.panelDark);
   g.restore();
-  strokeRoundRect(g, r.x, r.y, r.w, r.h, 16, open ? '#ffe9a8' : COLORS.panelBorder, 4);
+  strokeRoundRect(g, r.x, r.y, r.w, r.h, 16, open ? '#f3e3b4' : COLORS.panelBorder, 4);
 
   if (open) {
-    drawText(g, '营业中', cx, r.y + 40, { size: 32, weight: 700, align: 'center', color: '#3a2408' });
-    drawText(g, '第 ' + shop.day + ' 天 · 开门！', cx, r.y + 74, { size: 12, weight: 600, align: 'center', color: '#5a3a12' });
+    drawText(g, '营业中', cx, r.y + 40, { size: 32, weight: 700, align: 'center', color: '#33230f' });
+    drawText(g, '第 ' + shop.day + ' 天 · 开门！', cx, r.y + 74, { size: 12, weight: 600, align: 'center', color: '#50391c' });
     drawText(g, '🥮', cx, r.y + 102, { size: 20, align: 'center' });
   } else {
     drawText(g, '今日休息', cx, r.y + 40, { size: 29, weight: 700, align: 'center', color: COLORS.panelTitle });
