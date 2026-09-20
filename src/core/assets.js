@@ -458,7 +458,7 @@ function drawSprite(g, key, x, y, w, h, fallbackColor) {
   g.setLineDash([]);
   drawText(g, key, x + w / 2, y + h / 2, {
     size: Math.max(11, Math.min(20, w / 14)),
-    color: COLORS.textDim,
+    color: COLORS.cream,
     align: 'center',
   });
   g.restore();

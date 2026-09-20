@@ -148,7 +148,7 @@ function drawStockingWindow(g) {
   g.restore();
 
   uiPanel(g, p.x, p.y, p.w, p.h, { r: 20, color: COLORS.panelDark });
-  drawText(g, '今日菜单', p.x + 28, p.y + 38, { size: 25, weight: 700, color: COLORS.goldLight });
+  drawText(g, '今日菜单', p.x + 28, p.y + 38, { size: 25, weight: 700, color: COLORS.panelTitle });
   drawText(g, '免费勾选今天要卖的食材，顾客只会点菜单里的东西（至少各 1 种）', p.x + 28, p.y + 68, {
     size: 13, color: COLORS.textDim,
   });
@@ -166,7 +166,7 @@ function drawStockingWindow(g) {
     g.arc(r.x + 24, r.y + 27, 13, 0, Math.PI * 2);
     g.fill();
 
-    drawText(g, it.name, r.x + 46, r.y + 20, { size: 16, weight: 600, color: COLORS.cream });
+    drawText(g, it.name, r.x + 46, r.y + 20, { size: 16, weight: 600, color: COLORS.panelInk });
     drawText(g, it.kind === 'crust' ? '饼皮' : '馅料', r.x + 46, r.y + 40, { size: 12, color: COLORS.textDim });
 
     drawText(g, on ? '✔ 已加入菜单' : '加入菜单', r.x + r.w - 16, r.y + r.h / 2, {
@@ -177,7 +177,7 @@ function drawStockingWindow(g) {
   /* 右侧: 今日菜单预览 + 操作 */
   const rx = p.x + p.w - 320;
   uiPanel(g, rx, p.y + 92, 296, 322, { r: 12 });
-  drawText(g, '今日菜单', rx + 16, p.y + 118, { size: 16, weight: 700, color: COLORS.goldLight });
+  drawText(g, '今日菜单', rx + 16, p.y + 118, { size: 16, weight: 700, color: COLORS.panelTitle });
   drawText(g, '顾客只会点这些', rx + 16, p.y + 140, { size: 11, color: COLORS.textDim });
   let dy = p.y + 166;
   const selC = stockingSelected('crust');
@@ -193,7 +193,7 @@ function drawStockingWindow(g) {
   all.slice(0, 8).forEach((id) => {
     const isF = selF.indexOf(id) >= 0;
     drawText(g, (isF ? '馅 ' : '皮 ') + nameOf(isF ? 'filling' : 'crust', id), rx + 16, dy, {
-      size: 13, color: COLORS.cream,
+      size: 13, color: COLORS.panelInk,
     });
     dy += 26;
   });

@@ -12,21 +12,32 @@ let H = VH;
 let UI_SCALE = 1.18; // 文字放大系数
 let ICON_SCALE = 1.18; // 图标放大系数(以中心缩放, 不改变布局坐标)
 
-/* ---- 配色 ---- */
+/* ---- 配色: 暖橙卡通风 ----
+ * 三层表面:
+ *   背景 = 暖橙渐变(见 hud.js 的 drawFallbackBg / 贴图)
+ *   浅色面板 = 奶油底 + 深棕字(ink / inkDim)
+ *   橙色按钮/表头 = 橙底 + 奶油字(cream / goldLight) */
 const COLORS = {
-  bg: '#14100c',
-  panel: '#793b23', // 面板底色
-  panelLight: '#9a4d2e', // 悬停/浅面板
-  panelDark: '#5c2c1a', // 外层大面板(和内层区分)
-  panelBorder: '#fcc33f', // 面板/按钮包边
-  gold: '#d9a441',
-  goldLight: '#f2cf7a',
-  cream: '#f6ead2',
-  text: '#f6ead2',
-  textDim: '#b39b78',
-  ok: '#7fb069',
-  warn: '#e8b33a',
-  fail: '#d05a4e',
+  bg: '#b45f14',
+  bgWarm: '#f2a23e', // 背景暖橙
+  bgWarmDeep: '#d9761c', // 背景深橙
+  panel: '#fdf1d8', // 面板奶油底
+  panelLight: '#fff9ec', // 悬停/浅面板
+  panelDark: '#f7e3b8', // 外层大面板
+  panelInner: '#fbe7c2', // 面板里的凹槽/内层
+  panelBorder: '#e58a24', // 面板包边(琥珀橙)
+  panelInk: '#6d3a12', // 浅面板上的主文字
+  panelInkDim: '#9c6a33', // 浅面板上的次要文字
+  panelTitle: '#b8620f', // 浅面板上的小标题(深琥珀)
+  gold: '#e59a1f',
+  goldLight: '#ffd166',
+  cream: '#fff6e2', // 深色/橙底上的文字
+  creamDim: '#ffe6b0', // 深色/橙底上的次要文字
+  text: '#6d3a12',
+  textDim: '#9c6a33',
+  ok: '#63a83c',
+  warn: '#e08a1e',
+  fail: '#cf4a2e',
   lotus: '#c98a4b',
   bean: '#7b3f2e',
   custard: '#e8b33a',

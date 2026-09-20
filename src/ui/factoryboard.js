@@ -177,7 +177,7 @@ function fbDrawDrops(g) {
   const t = performance.now() / 1000;
   for (const d of factoryBoardDrops) {
     const def = d.kind === 'crust' ? findCrustDef(d.productId) : findFillingDef(d.productId);
-    const color = def ? def.color : COLORS.cream;
+    const color = def ? def.color : COLORS.panelInk;
     const bob = d.rest ? Math.sin(t * 4 + d.spin) * 1.6 : 0;
     const x = d.x;
     const y = d.y + bob;
@@ -428,7 +428,7 @@ function factoryBoardUp(x, y) {
     if (cell < 0) {
       const res = undeployUnit(drag.uid);
       if (res.ok) {
-        showScreenText('已收回 ' + factoryName(res.factoryId), '', COLORS.textDim);
+        showScreenText('已收回 ' + factoryName(res.factoryId), '', COLORS.creamDim);
         if (factoryBoard.selected === drag.uid) factoryBoard.selected = null;
       }
       return;
@@ -483,7 +483,7 @@ function fbHandleButton(b) {
     if (u) {
       const res = undeployUnit(u.uid);
       if (res.ok) {
-        showScreenText('已收回 ' + factoryName(res.factoryId), '', COLORS.textDim);
+        showScreenText('已收回 ' + factoryName(res.factoryId), '', COLORS.creamDim);
         factoryBoard.selected = null;
       }
     }
@@ -559,7 +559,7 @@ function drawLeftWarehouse(g) {
     const active = factoryBoard.tabWarehouse === keys[i];
     drawCard(g, r.x, r.y, r.w, r.h, 8, active);
     drawText(g, labels[i], r.x + r.w / 2, r.y + r.h / 2, {
-      size: 15, weight: 700, align: 'center', color: active ? COLORS.goldLight : COLORS.cream,
+      size: 15, weight: 700, align: 'center', color: active ? COLORS.panelTitle : COLORS.panelInk,
     });
   }
 
@@ -588,7 +588,7 @@ function drawWarehouseFactories(g) {
   const ids = warehouseFactoryIds();
   factoryBoard.maxScroll.warehouse = Math.max(0, ids.length * 52 - (FB.bottom - FB.top - 80));
   if (!ids.length) {
-    drawText(g, '（空）去下面「商店」买工厂卡', FB.leftX + 16, FB.top + 110, { size: 14, color: 'rgba(179,155,120,0.7)' });
+    drawText(g, '（空）去下面「商店」买工厂卡', FB.leftX + 16, FB.top + 110, { size: 14, color: COLORS.textDim });
   }
   ids.forEach((fid, i) => {
     const def = findFactoryDef(fid);
@@ -600,12 +600,12 @@ function drawWarehouseFactories(g) {
     g.globalAlpha = dragging ? 0.4 : 1;
     drawCard(g, r.x, r.y, r.w, r.h, 9, false);
     drawProductDot(g, r.x + 20, r.y + 23, def);
-    drawText(g, def ? def.name : fid, r.x + 36, r.y + 16, { size: 15, weight: 600, color: COLORS.cream, maxWidth: r.w - 90 });
+    drawText(g, def ? def.name : fid, r.x + 36, r.y + 16, { size: 15, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 90 });
     drawText(g, '仓库 x' + shop.factoryBag[fid] + ' · 拖到网格上场', r.x + 36, r.y + 34, {
       size: 12, color: COLORS.textDim,
     });
     fillRoundRect(g, sr.x, sr.y, sr.w, sr.h, 5, 'rgba(208,90,78,0.85)');
-    drawText(g, '卖', sr.x + sr.w / 2, sr.y + sr.h / 2, { size: 12, align: 'center', color: COLORS.cream });
+    drawText(g, '卖', sr.x + sr.w / 2, sr.y + sr.h / 2, { size: 12, align: 'center', color: COLORS.panelInk });
     g.restore();
   });
 }
@@ -614,7 +614,7 @@ function drawWarehouseComponents(g) {
   const ids = warehouseCompIds();
   factoryBoard.maxScroll.warehouse = Math.max(0, ids.length * 52 - (FB.bottom - FB.top - 80));
   if (!ids.length) {
-    drawText(g, '（空）等特殊客人掉落或商店购买', FB.leftX + 16, FB.top + 110, { size: 14, color: 'rgba(179,155,120,0.7)' });
+    drawText(g, '（空）等特殊客人掉落或商店购买', FB.leftX + 16, FB.top + 110, { size: 14, color: COLORS.textDim });
   }
   ids.forEach((cid, i) => {
     const cd = findComponentDef(cid);
@@ -628,11 +628,11 @@ function drawWarehouseComponents(g) {
     fillRoundRect(g, r.x, r.y, r.w, r.h, 9, 'rgba(50,32,20,0.94)');
     strokeRoundRect(g, r.x, r.y, r.w, r.h, 9, cd.type === 'special' ? COLORS.goldLight : 'rgba(217,164,65,0.5)', 1.5);
     drawSprite(g, cd.icon, r.x + 6, r.y + 6, 34, 34);
-    drawText(g, cd.name, r.x + 46, r.y + 16, { size: 15, weight: 600, color: COLORS.cream, maxWidth: r.w - 100 });
+    drawText(g, cd.name, r.x + 46, r.y + 16, { size: 15, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 100 });
     drawText(g, (cd.factoryId ? '专属' : '通用') + ' · ' + componentEffectText(cd) + ' · x' + shop.components[cid],
       r.x + 46, r.y + 34, { size: 12, color: cd.factoryId ? COLORS.warn : COLORS.textDim, maxWidth: r.w - 100 });
     fillRoundRect(g, sr.x, sr.y, sr.w, sr.h, 5, cd.buyable ? 'rgba(208,90,78,0.85)' : 'rgba(80,60,45,0.7)');
-    drawText(g, '卖', sr.x + sr.w / 2, sr.y + sr.h / 2, { size: 12, align: 'center', color: COLORS.cream });
+    drawText(g, '卖', sr.x + sr.w / 2, sr.y + sr.h / 2, { size: 12, align: 'center', color: COLORS.panelInk });
     g.restore();
   });
 }
@@ -646,25 +646,25 @@ function drawBackpackTab(g) {
   for (const group of kinds) {
     const got = group.defs.filter((d) => backpackCount(group.kind, d.id) > 0);
     if (!got.length) continue;
-    drawText(g, group.kind === 'crust' ? '饼皮' : '馅料', FB.leftX + 16, y, { size: 14, weight: 700, color: COLORS.goldLight });
+    drawText(g, group.kind === 'crust' ? '饼皮' : '馅料', FB.leftX + 16, y, { size: 14, weight: 700, color: COLORS.panelTitle });
     y += 26;
     for (const d of got) {
-      fillRoundRect(g, FB.leftX + 12, y - 15, FB.leftW - 24, 36, 8, 'rgba(42,24,16,0.9)');
-      g.fillStyle = d.color || COLORS.cream;
+      fillRoundRect(g, FB.leftX + 12, y - 15, FB.leftW - 24, 36, 8, 'rgba(229,138,36,0.16)');
+      g.fillStyle = d.color || COLORS.panelInk;
       g.beginPath();
       g.arc(FB.leftX + 28, y + 3, 10, 0, Math.PI * 2);
       g.fill();
-      drawText(g, d.name, FB.leftX + 46, y + 3, { size: 14, weight: 600, color: COLORS.cream });
+      drawText(g, d.name, FB.leftX + 46, y + 3, { size: 14, weight: 600, color: COLORS.panelInk });
       drawText(g, 'x' + backpackCount(group.kind, d.id), FB.leftX + FB.leftW - 24, y + 3, {
-        size: 15, weight: 700, align: 'right', color: COLORS.gold,
+        size: 15, weight: 700, align: 'right', color: COLORS.panelTitle,
       });
       y += 44;
     }
     y += 8;
   }
   if (y === FB.top + 76) {
-    drawText(g, '背包是空的', FB.leftX + 16, FB.top + 110, { size: 14, color: 'rgba(179,155,120,0.7)' });
-    drawText(g, '点网格工厂上的「产物」徽标收集', FB.leftX + 16, FB.top + 136, { size: 12, color: 'rgba(179,155,120,0.55)' });
+    drawText(g, '背包是空的', FB.leftX + 16, FB.top + 110, { size: 14, color: COLORS.textDim });
+    drawText(g, '点网格工厂上的「产物」徽标收集', FB.leftX + 16, FB.top + 136, { size: 12, color: COLORS.textDim });
   }
 }
 
@@ -682,7 +682,7 @@ function drawGridBoard(g) {
     }
     const u = unitAtCell(cell);
     if (!u) {
-      fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(24,18,12,0.5)');
+      fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(196,150,88,0.22)');
       g.save();
       g.strokeStyle = 'rgba(179,155,120,0.25)';
       g.setLineDash([6, 6]);
@@ -708,8 +708,8 @@ function drawCoreCell(g, r, used, cap) {
   g.arc(cx, cy, 26, 0, Math.PI * 2);
   g.fill();
   g.restore();
-  drawText(g, '能源核心', cx, cy - 22, { size: 15, weight: 700, align: 'center', color: COLORS.goldLight });
-  drawText(g, 'Lv.' + coreLevel(), cx, cy + 4, { size: 20, weight: 700, align: 'center', color: COLORS.cream });
+  drawText(g, '能源核心', cx, cy - 22, { size: 15, weight: 700, align: 'center', color: COLORS.panelTitle });
+  drawText(g, 'Lv.' + coreLevel(), cx, cy + 4, { size: 20, weight: 700, align: 'center', color: COLORS.panelInk });
   drawText(g, '电量 ' + used + '/' + cap, cx, cy + 30, {
     size: 14, weight: 600, align: 'center', color: full ? COLORS.warn : COLORS.ok,
   });
@@ -720,12 +720,12 @@ function drawUnitCard(g, u, r, on, sel) {
   const dragging = factoryBoard.drag && factoryBoard.drag.kind === 'unit' && factoryBoard.drag.uid === u.uid;
   g.save();
   g.globalAlpha = dragging ? 0.4 : 1;
-  fillRoundRect(g, r.x, r.y, r.w, r.h, 10, on ? 'rgba(52,42,24,0.97)' : 'rgba(38,28,20,0.97)');
+  fillRoundRect(g, r.x, r.y, r.w, r.h, 10, on ? '#fbe7c2' : '#f3ddb4');
   strokeRoundRect(g, r.x, r.y, r.w, r.h, 10, sel ? COLORS.goldLight : on ? COLORS.ok : 'rgba(179,155,120,0.5)', sel ? 3 : 2);
 
   drawProductDot(g, r.x + 14, r.y + 14, def);
   drawText(g, def ? def.name : u.factoryId, r.x + 26, r.y + 14, {
-    size: 12, weight: 600, color: COLORS.cream, maxWidth: r.w - 34,
+    size: 12, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 34,
   });
 
   /* 槽位小格 */
@@ -736,7 +736,7 @@ function drawUnitCard(g, u, r, on, sel) {
   for (let i = 0; i < total; i++) {
     const sx = startX + i * (sw + gp);
     const sy = r.y + 30;
-    fillRoundRect(g, sx, sy, sw, sw, 4, u.slots[i] ? 'rgba(217,164,65,0.9)' : 'rgba(20,16,12,0.8)');
+    fillRoundRect(g, sx, sy, sw, sw, 4, u.slots[i] ? 'rgba(217,164,65,0.9)' : 'rgba(160,110,60,0.28)');
     strokeRoundRect(g, sx, sy, sw, sw, 4, u.slots[i] ? COLORS.goldLight : 'rgba(179,155,120,0.4)', 1);
   }
 
@@ -773,9 +773,9 @@ function drawRightDetail(g) {
 
   const u = shop.units[factoryBoard.selected];
   if (!u) {
-    drawText(g, '点网格上的工厂查看', FB.rightX + 16, FB.top + 28, { size: 16, weight: 700, color: COLORS.goldLight });
+    drawText(g, '点网格上的工厂查看', FB.rightX + 16, FB.top + 28, { size: 16, weight: 700, color: COLORS.panelTitle });
     drawText(g, '能源核心 Lv.' + coreLevel() + '　总电量 ' + coreCapacity(), FB.rightX + 16, FB.top + 56, {
-      size: 14, color: COLORS.cream,
+      size: 14, color: COLORS.panelInk,
     });
     drawText(g, '每座工厂耗 1 电，多出来的工厂会断电', FB.rightX + 16, FB.top + 80, {
       size: 12, color: COLORS.textDim,
@@ -784,7 +784,7 @@ function drawRightDetail(g) {
     const def = findFactoryDef(u.factoryId);
     const on = isUnitPowered(u.uid);
     drawText(g, (def ? def.name : u.factoryId) + (on ? ' ⚡' : ' ⚡断电'), FB.rightX + 16, FB.top + 26, {
-      size: 18, weight: 700, color: on ? COLORS.goldLight : COLORS.textDim,
+      size: 18, weight: 700, color: on ? COLORS.panelTitle : COLORS.textDim,
     });
     drawText(g, '速度 ' + u.speed.toFixed(1) + '/s　品质 ' + u.quality.toFixed(1) + '　待捡 ' + u.drops,
       FB.rightX + 16, FB.top + 54, { size: 13, color: COLORS.textDim });
@@ -800,7 +800,7 @@ function drawRightDetail(g) {
         fillRoundRect(g, r.x, r.y, r.w, r.h, 9, 'rgba(60,40,24,0.95)');
         strokeRoundRect(g, r.x, r.y, r.w, r.h, 9, cd && cd.type === 'special' ? COLORS.goldLight : COLORS.gold, 2);
         drawSprite(g, cd ? cd.icon : 'icon_unlock', r.x + 8, r.y + 10, 36, 36);
-        drawText(g, cd ? cd.name : '?', r.x + 50, r.y + 22, { size: 12, weight: 600, color: COLORS.cream, maxWidth: r.w - 58 });
+        drawText(g, cd ? cd.name : '?', r.x + 50, r.y + 22, { size: 12, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 58 });
         drawText(g, 'Lv.' + slot.level + (top ? ' ↑可升级' : ''), r.x + 50, r.y + 42, {
           size: 11, color: top ? COLORS.ok : COLORS.textDim,
         });
@@ -808,7 +808,7 @@ function drawRightDetail(g) {
           size: 9, color: COLORS.textDim, maxWidth: r.w - 16,
         });
       } else {
-        fillRoundRect(g, r.x, r.y, r.w, r.h, 9, 'rgba(24,18,12,0.9)');
+        fillRoundRect(g, r.x, r.y, r.w, r.h, 9, COLORS.panelInner);
         g.save();
         g.strokeStyle = 'rgba(179,155,120,0.4)';
         g.setLineDash([6, 6]);
@@ -877,14 +877,14 @@ function drawShopModal(g) {
   g.restore();
   uiPanel(g, p.x, p.y, p.w, p.h, { r: 18, color: COLORS.panelDark });
 
-  drawText(g, '商店', p.x + 18, p.y + 28, { size: 22, weight: 700, color: COLORS.goldLight });
+  drawText(g, '商店', p.x + 18, p.y + 28, { size: 22, weight: 700, color: COLORS.panelTitle });
   const labels = ['工厂', '组件'];
   for (let i = 0; i < 2; i++) {
     const r = fbShopTabRect(i);
     const active = (i === 0) === (factoryBoard.tabShop === 'factory');
     drawCard(g, r.x, r.y, r.w, r.h, 8, active);
     drawText(g, labels[i], r.x + r.w / 2, r.y + r.h / 2, {
-      size: 15, weight: 700, align: 'center', color: active ? COLORS.goldLight : COLORS.cream,
+      size: 15, weight: 700, align: 'center', color: active ? COLORS.panelTitle : COLORS.panelInk,
     });
   }
   const close = { x: p.x + p.w - 96, y: p.y + 12, w: 84, h: 34 };
@@ -913,17 +913,17 @@ function drawShopModal(g) {
       const iconKey = def.kind === 'crust' ? 'factory_crust' : def.kind === 'filling' ? 'factory_filling' : null;
       if (iconKey && img(iconKey)) {
         drawSprite(g, iconKey, r.x + 10, r.y + 16, 56, 56);
-        drawText(g, def.name, r.x + 74, r.y + 26, { size: 15, weight: 700, color: COLORS.cream, maxWidth: r.w - 86 });
+        drawText(g, def.name, r.x + 74, r.y + 26, { size: 15, weight: 700, color: COLORS.panelInk, maxWidth: r.w - 86 });
         drawText(g, kindLabel, r.x + 74, r.y + 48, { size: 11, color: COLORS.textDim });
       } else {
         drawProductDot(g, r.x + 28, r.y + 30, def);
-        drawText(g, def.name, r.x + 48, r.y + 22, { size: 15, weight: 700, color: COLORS.cream, maxWidth: r.w - 60 });
+        drawText(g, def.name, r.x + 48, r.y + 22, { size: 15, weight: 700, color: COLORS.panelInk, maxWidth: r.w - 60 });
         drawText(g, kindLabel, r.x + 48, r.y + 44, { size: 11, color: COLORS.textDim });
       }
     } else {
       drawSprite(g, def.icon, r.x + 12, r.y + 14, 44, 44);
-      drawText(g, def.name, r.x + 64, r.y + 22, { size: 15, weight: 700, color: COLORS.cream, maxWidth: r.w - 74 });
-      drawText(g, componentEffectText(def), r.x + 64, r.y + 44, { size: 12, weight: 600, color: COLORS.goldLight, maxWidth: r.w - 74 });
+      drawText(g, def.name, r.x + 64, r.y + 22, { size: 15, weight: 700, color: COLORS.panelInk, maxWidth: r.w - 74 });
+      drawText(g, componentEffectText(def), r.x + 64, r.y + 44, { size: 12, weight: 600, color: COLORS.panelTitle, maxWidth: r.w - 74 });
       drawText(g, def.desc, r.x + 64, r.y + 64, { size: 10, color: COLORS.textDim, maxWidth: r.w - 74 });
     }
 
@@ -985,7 +985,7 @@ function uiBarMini(g, x, y, w, h, ratio, color) {
   if (r > 0) fillRoundRect(g, x, y, Math.max(h, w * r), h, h / 2, color);
 }
 function drawProductDot(g, x, y, def) {
-  let color = COLORS.cream;
+  let color = COLORS.panelInk;
   if (def) {
     if (def.kind === 'util') color = COLORS.icy;
     else {

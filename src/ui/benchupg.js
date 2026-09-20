@@ -108,7 +108,7 @@ function benchUpgradeHandleDown(x, y) {
     if (!pointInRect(x, y, benchUpgradeBtnRect(i))) continue;
     const row = rows[i];
     if (row.cost == null) {
-      showScreenText('「' + row.name + '」已满级', '', COLORS.textDim);
+      showScreenText('「' + row.name + '」已满级', '', COLORS.creamDim);
       return true;
     }
     if (shop.coins < row.cost) {
@@ -146,7 +146,7 @@ function drawBenchUpgradeWindow(g) {
   let title = '制作台升级';
   if (focus && focus.kind === 'bench') title = '制作台升级 · 第 ' + (focus.index + 1) + ' 个制作台';
   else if (focus && focus.kind === 'oven') title = '烤炉升级 · 第 ' + (focus.index + 1) + ' 个烤位';
-  drawText(g, title, p.x + 28, p.y + 38, { size: 26, weight: 700, color: COLORS.goldLight });
+  drawText(g, title, p.x + 28, p.y + 38, { size: 26, weight: 700, color: COLORS.panelTitle });
   drawText(g, '金币 ' + formatNum(shop.coins), p.x + p.w - 140, p.y + 38, {
     size: 18, weight: 700, align: 'right', color: COLORS.gold,
   });
@@ -160,8 +160,8 @@ function drawBenchUpgradeWindow(g) {
     const afford = !full && shop.coins >= row.cost;
     drawCard(g, r.x, r.y, r.w, r.h, 12, !full);
 
-    drawText(g, row.name, r.x + 20, r.y + 26, { size: 19, weight: 700, color: COLORS.cream });
-    drawText(g, row.value, r.x + 20, r.y + 52, { size: 15, weight: 600, color: COLORS.goldLight });
+    drawText(g, row.name, r.x + 20, r.y + 26, { size: 19, weight: 700, color: COLORS.panelInk });
+    drawText(g, row.value, r.x + 20, r.y + 52, { size: 15, weight: 600, color: COLORS.panelTitle });
     drawText(g, row.desc, r.x + 210, r.y + 40, {
       size: 13, color: COLORS.textDim, maxWidth: r.w - 470,
     });

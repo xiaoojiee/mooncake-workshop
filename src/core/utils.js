@@ -69,13 +69,22 @@ function drawText(ctx, text, x, y, opts) {
   const o = opts || {};
   ctx.save();
   if (o.size) setFont(ctx, o.size, o.weight);
-  ctx.fillStyle = o.color || '#f6ead2';
+  ctx.fillStyle = o.color || '#6d3a12';
   ctx.textAlign = o.align || 'left';
   ctx.textBaseline = o.baseline || 'middle';
   if (o.shadow) {
     ctx.shadowColor = o.shadow;
     ctx.shadowBlur = o.shadowBlur || 4;
     ctx.shadowOffsetY = o.shadowOffsetY || 2;
+  }
+  /* 卡通描边字: 先描粗边再填色 */
+  if (o.stroke) {
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.lineWidth = o.strokeWidth || 3;
+    ctx.strokeStyle = o.stroke;
+    if (o.maxWidth) ctx.strokeText(text, x, y, o.maxWidth);
+    else ctx.strokeText(text, x, y);
   }
   if (o.maxWidth) ctx.fillText(text, x, y, o.maxWidth);
   else ctx.fillText(text, x, y);
@@ -87,7 +96,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, opts) {
   if (o.size) setFont(ctx, o.size, o.weight);
   ctx.textAlign = o.align || 'left';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = o.color || '#f6ead2';
+  ctx.fillStyle = o.color || '#6d3a12';
   const lh = lineHeight * (UI_SCALE || 1);
   let line = '';
   let cy = y;

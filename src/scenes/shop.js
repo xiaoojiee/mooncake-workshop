@@ -377,7 +377,7 @@ scenes.register(
         size: 17, color: COLORS.textDim, maxWidth: 440,
       });
       drawText(ctx, '剩余营业 ' + formatTime(run.dayTimeLeft) + '　已服务 ' + run.dayServed + '　流失 ' + run.dayLost, LAYOUT.bench.x + 28, LAYOUT.bottomY + 88, {
-        size: 15, color: COLORS.cream, maxWidth: 440,
+        size: 15, color: COLORS.panelInk, maxWidth: 440,
       });
 
       game.buttons = [
@@ -1256,7 +1256,7 @@ function drawMiniOrder(g, order, x, y, w) {
 function drawHotbar(g) {
   const s = LAYOUT.backpack;
   uiPanel(g, s.x, s.y, s.w, s.h, { r: 14 });
-  drawText(g, '快捷栏 · 拖动取用', s.x + 14, s.y + 24, { size: 16, weight: 700, color: COLORS.goldLight });
+  drawText(g, '快捷栏 · 拖动取用', s.x + 14, s.y + 24, { size: 16, weight: 700, color: COLORS.panelTitle });
 
   clampHotbarScroll();
   const a = hotbarPanelArea();
@@ -1267,7 +1267,7 @@ function drawHotbar(g) {
 
   const items = hotbarItems();
   if (!items.length) {
-    drawText(g, '背包空：点下方「背包」按钮', s.x + 14, s.y + 78, { size: 13, color: 'rgba(179,155,120,0.7)' });
+    drawText(g, '背包空：点下方「背包」按钮', s.x + 14, s.y + 78, { size: 13, color: COLORS.textDim });
   }
   for (const it of items) {
     const r = it.rect;
@@ -1279,7 +1279,7 @@ function drawHotbar(g) {
 
     g.save();
     g.globalAlpha = empty ? 0.45 : 1;
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, empty ? 'rgba(30,20,14,0.7)' : COLORS.panelLight);
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, empty ? '#efdcb8' : COLORS.panelLight);
 
     let drew = false;
     if (it.kind === 'crust') drew = drawCrustPart(g, def.col, 'raw', r.x + 8, cy - 22, 44, 44);
@@ -1292,7 +1292,7 @@ function drawHotbar(g) {
     }
 
     drawText(g, def.name, r.x + 62, cy - 8, {
-      size: 16, weight: 600, color: COLORS.cream, maxWidth: r.w - 120,
+      size: 16, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 120,
     });
     drawText(g, '售价 💰' + (def.value || 0), r.x + 62, cy + 14, {
       size: 12, weight: 600, color: COLORS.gold,
@@ -1315,14 +1315,14 @@ function drawHotbar(g) {
 function drawBench(g) {
   const b = LAYOUT.bench;
   uiPanel(g, b.x, b.y, b.w, b.h, { r: 14 });
-  drawText(g, '制作台（拖面皮 → 拖馅料叠加）', b.x + 14, b.y + 24, { size: 15, weight: 700, color: COLORS.goldLight });
+  drawText(g, '制作台（拖面皮 → 拖馅料叠加）', b.x + 14, b.y + 24, { size: 15, weight: 700, color: COLORS.panelTitle });
 
   run.slots.forEach((slot, i) => {
     const r = slotRect(i);
     const cx = r.x + r.w / 2;
     const cy = r.y + r.h / 2 + 10;
 
-    fillRoundRect(g, r.x + 6, r.y + 40, r.w - 12, r.h - 52, 12, 'rgba(20,16,12,0.5)');
+    fillRoundRect(g, r.x + 6, r.y + 40, r.w - 12, r.h - 52, 12, 'rgba(196,150,88,0.22)');
     drawSlotMoon(g, slot, cx, cy, 64);
 
     /* 层数/完成度提示 */
@@ -1340,7 +1340,7 @@ function drawBench(g) {
 function drawOven(g) {
   const o = LAYOUT.oven;
   uiPanel(g, o.x, o.y, o.w, o.h, { r: 14 });
-  drawText(g, '烤炉（拖入烘烤 · 滚轮滚动）', o.x + 14, o.y + 26, { size: 15, weight: 700, color: COLORS.goldLight });
+  drawText(g, '烤炉（拖入烘烤 · 滚轮滚动）', o.x + 14, o.y + 26, { size: 15, weight: 700, color: COLORS.panelTitle });
 
   clampOvenScroll();
   const area = ovenPanelArea();
@@ -1357,7 +1357,7 @@ function drawOven(g) {
     const done = ovenDone(os);
     const burnt = ovenBurnt(os);
     const border = burnt ? COLORS.fail : done ? COLORS.ok : os.state === 'baking' ? COLORS.warn : 'rgba(217,164,65,0.3)';
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(20,16,12,0.6)');
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, '#f4e0b8');
     strokeRoundRect(g, r.x, r.y, r.w, r.h, 10, border, 2);
 
     if (os.state === 'baking' && os.moon) {
@@ -1516,10 +1516,10 @@ function drawFactoryPanel(g) {
   g.fillRect(0, 0, W, H);
   g.restore();
 
-  uiPanel(g, px, py, p.w, p.h, { r: 20, color: 'rgba(32,22,14,0.97)' });
+  uiPanel(g, px, py, p.w, p.h, { r: 20, color: COLORS.panelLight });
 
   drawText(g, '工厂 · 槽位与组件（营业继续中，客人还在等）', px + 24, py + 32, {
-    size: 20, weight: 700, color: COLORS.goldLight,
+    size: 20, weight: 700, color: COLORS.panelTitle,
   });
   drawText(g, '开槽 → 装组件 → 升级组件　|　Esc / 关闭按钮 退出', px + 24, py + 58, {
     size: 13, color: COLORS.textDim,
@@ -1539,7 +1539,7 @@ function drawFactoryList(g) {
   if (!ids.length) {
     game.factorySel = null;
     drawText(g, '还没有工厂上场', p.x + 20, p.y + 120, { size: 13, color: COLORS.textDim });
-    drawText(g, '去「工厂管理」把工厂拖到网格上', p.x + 20, p.y + 144, { size: 11, color: 'rgba(179,155,120,0.7)' });
+    drawText(g, '去「工厂管理」把工厂拖到网格上', p.x + 20, p.y + 144, { size: 11, color: COLORS.textDim });
     return;
   }
   const sel = shop.units[game.factorySel] ? game.factorySel : ids[0];
@@ -1550,11 +1550,11 @@ function drawFactoryList(g) {
   /* 分组标题: 饼皮 / 馅料 */
   const crustCount = crustUnitCount();
   if (crustCount > 0) {
-    drawText(g, '饼皮', p.x + 20, factoryListItemRect(0).y - 9, { size: 11, weight: 700, color: COLORS.goldLight });
+    drawText(g, '饼皮', p.x + 20, factoryListItemRect(0).y - 9, { size: 11, weight: 700, color: COLORS.panelTitle });
   }
   if (crustCount < ids.length) {
     const fr0 = factoryListItemRect(crustCount);
-    drawText(g, '馅料', p.x + 20, fr0.y - 9, { size: 11, weight: 700, color: COLORS.goldLight });
+    drawText(g, '馅料', p.x + 20, fr0.y - 9, { size: 11, weight: 700, color: COLORS.panelTitle });
     g.strokeStyle = 'rgba(217,164,65,0.25)';
     g.lineWidth = 1;
     g.beginPath();
@@ -1574,16 +1574,16 @@ function drawFactoryList(g) {
     const r = factoryListItemRect(i);
     const active = uid === sel;
 
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, active ? 'rgba(217,164,65,0.22)' : 'rgba(42,24,16,0.85)');
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, active ? 'rgba(217,164,65,0.22)' : COLORS.panelInner);
     if (active) strokeRoundRect(g, r.x, r.y, r.w, r.h, 8, COLORS.gold, 2);
 
-    g.fillStyle = product ? product.color : COLORS.cream;
+    g.fillStyle = product ? product.color : COLORS.panelInk;
     g.beginPath();
     g.arc(r.x + 13, r.y + r.h / 2, 6, 0, Math.PI * 2);
     g.fill();
 
     drawText(g, (def ? def.name : u.factoryId) + (on ? '' : ' ⚡断'), r.x + 24, r.y + 13, {
-      size: 11, weight: 600, color: on ? (productOk ? COLORS.cream : COLORS.textDim) : COLORS.textDim, maxWidth: r.w - 30,
+      size: 11, weight: 600, color: on ? (productOk ? COLORS.panelInk : COLORS.textDim) : COLORS.textDim, maxWidth: r.w - 30,
     });
     drawText(g, u.slots.length + '槽 ' + Math.floor(u.stock) + '份' + (productOk ? '' : ' 🔒'),
       r.x + 24, r.y + 28,
@@ -1611,7 +1611,7 @@ function drawSelectedFactory(g) {
   const cx = p.x + 356;
 
   drawText(g, (def ? def.name : u.factoryId) + (on ? ' ⚡' : ' ⚡断'), cx, p.y + 80, {
-    size: 17, weight: 700, color: on ? COLORS.goldLight : COLORS.textDim,
+    size: 17, weight: 700, color: on ? COLORS.panelTitle : COLORS.textDim,
   });
   drawText(g, '速度 ' + u.speed.toFixed(1) + '/s　品质 ' + u.quality.toFixed(1) + '　上限 ' + u.capacity,
     cx, p.y + 104, { size: 12, color: COLORS.textDim });
@@ -1633,10 +1633,10 @@ function drawSelectedFactory(g) {
       fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(60,40,24,0.95)');
       strokeRoundRect(g, r.x, r.y, r.w, r.h, 10, cd && cd.type === 'special' ? COLORS.goldLight : COLORS.gold, 2);
       drawSprite(g, cd ? cd.icon : 'icon_unlock', r.x + r.w / 2 - 18, r.y + 10, 36, 36);
-      drawText(g, cd ? cd.name : '?', r.x + r.w / 2, r.y + 58, { size: 12, weight: 600, align: 'center', color: COLORS.cream });
+      drawText(g, cd ? cd.name : '?', r.x + r.w / 2, r.y + 58, { size: 12, weight: 600, align: 'center', color: COLORS.panelInk });
       drawText(g, 'Lv.' + slot.level, r.x + r.w / 2, r.y + 76, { size: 11, align: 'center', color: COLORS.gold });
     } else {
-      fillRoundRect(g, r.x, r.y, r.w, r.h, 10, 'rgba(24,18,12,0.9)');
+      fillRoundRect(g, r.x, r.y, r.w, r.h, 10, COLORS.panelInner);
       g.save();
       g.strokeStyle = 'rgba(179,155,120,0.45)';
       g.setLineDash([6, 6]);
@@ -1675,10 +1675,10 @@ function drawSelectedFactory(g) {
   /* 组装效果汇总 + 烤位 */
   const sb = statsBoxRect();
   uiPanel(g, sb.x, sb.y, sb.w, sb.h, { r: 10, shadow: false });
-  drawText(g, '组装效果', sb.x + 12, sb.y + 18, { size: 13, weight: 600, color: COLORS.goldLight });
+  drawText(g, '组装效果', sb.x + 12, sb.y + 18, { size: 13, weight: 600, color: COLORS.panelTitle });
   const effects = collectFactoryEffects(u);
   drawText(g, effects || '（空槽）', sb.x + 12, sb.y + 42, {
-    size: 11, color: effects ? COLORS.cream : COLORS.textDim, maxWidth: sb.w - 200,
+    size: 11, color: effects ? COLORS.panelInk : COLORS.textDim, maxWidth: sb.w - 200,
   });
   /* 烤位在右下角小按钮 */
   const ups = upgradesFor('oven');
@@ -1729,7 +1729,7 @@ function drawComponentBag(g) {
   drawText(g, '组件背包（拖到左侧空槽）', bx, p.y + 104, { size: 13, weight: 600, color: COLORS.textDim });
   const owned = Object.keys(shop.components).filter((id) => shop.components[id] > 0);
   if (!owned.length) {
-    drawText(g, '背包为空，去下方购买', bx + 4, p.y + 158, { size: 12, color: 'rgba(179,155,120,0.6)' });
+    drawText(g, '背包为空，去下方购买', bx + 4, p.y + 158, { size: 12, color: COLORS.textDim });
   }
   owned.slice(0, 6).forEach((compId, i) => {
     const cd = findComponentDef(compId);
@@ -1741,7 +1741,7 @@ function drawComponentBag(g) {
     fillRoundRect(g, r.x, r.y, r.w, r.h, 8, 'rgba(50,32,20,0.9)');
     strokeRoundRect(g, r.x, r.y, r.w, r.h, 8, cd.type === 'special' ? COLORS.goldLight : 'rgba(217,164,65,0.4)', 1.5);
     drawSprite(g, cd.icon, r.x + 6, r.y + 8, 34, 34);
-    drawText(g, cd.name, r.x + 46, r.y + 18, { size: 11, weight: 600, color: COLORS.cream, maxWidth: 80 });
+    drawText(g, cd.name, r.x + 46, r.y + 18, { size: 11, weight: 600, color: COLORS.panelInk, maxWidth: 80 });
     if (cd.factoryId) {
       drawText(g, '专属', r.x + 46, r.y + 34, { size: 9, color: COLORS.warn });
     }
@@ -1755,13 +1755,13 @@ function drawComponentBag(g) {
   }
 
   /* 购买 */
-  drawText(g, '购买组件', bx, p.y + 336, { size: 13, weight: 600, color: COLORS.goldLight });
+  drawText(g, '购买组件', bx, p.y + 336, { size: 13, weight: 600, color: COLORS.panelTitle });
   const buyable = COMPONENT_TYPES.filter((c) => c.buyable).slice(0, 5);
   buyable.forEach((cd, i) => {
     const r = buyCompRect(i);
     const afford = shop.coins >= cd.cost;
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, afford ? 'rgba(60,40,24,0.9)' : 'rgba(30,22,16,0.9)');
-    drawText(g, cd.name, r.x + 10, r.y + r.h / 2, { size: 12, weight: 600, color: COLORS.cream });
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 8, afford ? 'rgba(60,40,24,0.9)' : '#f0dcbc');
+    drawText(g, cd.name, r.x + 10, r.y + r.h / 2, { size: 12, weight: 600, color: COLORS.panelInk });
     drawText(g, '💰' + cd.cost, r.x + r.w - 10, r.y + r.h / 2, {
       size: 12, weight: 600, align: 'right', color: afford ? COLORS.gold : COLORS.fail,
     });
@@ -1904,7 +1904,7 @@ function drawDayEnd(g) {
   g.restore();
 
   uiPanel(g, W / 2 - 280, 150, 560, 400, { r: 20 });
-  drawText(g, '第 ' + shop.day + ' 天 营业结束', W / 2, 200, { size: 28, weight: 700, align: 'center', color: COLORS.goldLight });
+  drawText(g, '第 ' + shop.day + ' 天 营业结束', W / 2, 200, { size: 28, weight: 700, align: 'center', color: COLORS.panelTitle });
 
   const rows = [
     ['服务客人', run.dayServed + ' 位'],
@@ -1915,7 +1915,7 @@ function drawDayEnd(g) {
   rows.forEach((r, i) => {
     const ry = 260 + i * 44;
     drawText(g, r[0], W / 2 - 220, ry, { size: 17, color: COLORS.textDim });
-    drawText(g, r[1], W / 2 + 220, ry, { size: 19, weight: 700, align: 'right', color: COLORS.cream });
+    drawText(g, r[1], W / 2 + 220, ry, { size: 19, weight: 700, align: 'right', color: COLORS.panelInk });
   });
 
   const r = dayEndButtonRect();

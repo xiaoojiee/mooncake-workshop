@@ -58,7 +58,7 @@ scenes.register(
       });
       drawText(ctx, 'MONOCAKE WORKSHOP', W / 2, H / 2 - 38, {
         size: 14,
-        color: COLORS.textDim,
+        color: COLORS.creamDim,
         align: 'center',
       });
 
@@ -81,7 +81,7 @@ scenes.register(
               ? '同步账号数据…'
               : '准备完成';
 
-      drawText(ctx, label, W / 2, by + 46, { size: 15, color: COLORS.textDim, align: 'center' });
+      drawText(ctx, label, W / 2, by + 46, { size: 15, color: COLORS.creamDim, align: 'center' });
       drawText(ctx, '缺失素材会自动占位, 不影响试玩', W / 2, by + 74, {
         size: 12,
         color: 'rgba(179,155,120,0.6)',

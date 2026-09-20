@@ -197,7 +197,7 @@ function drawBackpackWindow(g) {
 
   uiPanel(g, p.x, p.y, p.w, p.h, { r: 16, color: COLORS.panelDark });
   drawText(g, '背包（拖动产物到制作台 · 滚轮滚动 · 再点左上角按钮关闭）', p.x + 18, p.y + 20, {
-    size: 16, weight: 700, color: COLORS.goldLight,
+    size: 16, weight: 700, color: COLORS.panelTitle,
   });
 
   /* 裁剪到内容区 */
@@ -209,7 +209,7 @@ function drawBackpackWindow(g) {
 
   const items = backpackCellRects();
   if (!items.length) {
-    drawText(g, '背包是空的：去工厂面板收集产物', p.x + 18, p.y + 70, { size: 15, color: 'rgba(179,155,120,0.7)' });
+    drawText(g, '背包是空的：去工厂面板收集产物', p.x + 18, p.y + 70, { size: 15, color: COLORS.textDim });
   }
   for (const it of items) {
     const r = it.rect;
@@ -235,7 +235,7 @@ function drawBackpackWindow(g) {
       size: 14, weight: 700, align: 'right', color: empty ? COLORS.fail : COLORS.gold,
     });
     drawText(g, it.name, cx, r.y + 62, {
-      size: 12, weight: 600, align: 'center', color: COLORS.cream, maxWidth: r.w - 4,
+      size: 12, weight: 600, align: 'center', color: COLORS.panelInk, maxWidth: r.w - 4,
     });
     drawText(g, '售价 💰' + it.value, cx, r.y + 80, {
       size: 12, weight: 700, align: 'center', color: COLORS.gold,
@@ -275,7 +275,7 @@ function drawBackpackWindow(g) {
     } else {
       const fi = findFillingDef(d.productId);
       if (!drawFillingIcon(g, fi ? fi.index : 0, d.x, d.y, 54)) {
-        g.fillStyle = fi ? fi.color : COLORS.cream;
+        g.fillStyle = fi ? fi.color : COLORS.panelInk;
         g.beginPath();
         g.arc(d.x, d.y, 24, 0, Math.PI * 2);
         g.fill();

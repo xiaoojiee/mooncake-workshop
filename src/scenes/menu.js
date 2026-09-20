@@ -155,7 +155,7 @@ scenes.register(
         size: 17, color: COLORS.textDim, maxWidth: 210,
       });
       drawText(ctx, '第 ' + shop.day + ' 天　金币 ' + formatNum(shop.coins) + '　口碑 ' + shop.reputation,
-        LAYOUT.bench.x + 28, LAYOUT.bottomY + 88, { size: 15, color: COLORS.cream, maxWidth: 210 });
+        LAYOUT.bench.x + 28, LAYOUT.bottomY + 88, { size: 15, color: COLORS.panelInk, maxWidth: 210 });
 
       for (const b of menuState.buttons) uiButton(ctx, b);
 
@@ -171,7 +171,7 @@ scenes.register(
       });
       const un = '互动解锁：赞' + (interact.liked ? '✔' : '✘') + ' 币' + (interact.coin ? '✔' : '✘')
         + ' 藏' + (interact.fav ? '✔' : '✘') + ' 关注' + (interact.following ? '✔' : '✘');
-      drawText(ctx, un, W - 28, LAYOUT.bottomY + 120, { size: 13, align: 'right', color: 'rgba(179,155,120,0.7)' });
+      drawText(ctx, un, W - 28, LAYOUT.bottomY + 120, { size: 13, align: 'right', color: COLORS.textDim });
     },
   }),
 );
@@ -218,7 +218,7 @@ function drawFlipSign(g) {
     drawText(g, '第 ' + shop.day + ' 天 · 开门！', cx, r.y + 74, { size: 12, weight: 600, align: 'center', color: '#5a3a12' });
     drawText(g, '🥮', cx, r.y + 102, { size: 20, align: 'center' });
   } else {
-    drawText(g, '今日休息', cx, r.y + 40, { size: 29, weight: 700, align: 'center', color: COLORS.goldLight });
+    drawText(g, '今日休息', cx, r.y + 40, { size: 29, weight: 700, align: 'center', color: COLORS.panelTitle });
     drawText(g, '点击翻牌子 · 开门营业', cx, r.y + 74, {
       size: 12, weight: 600, align: 'center', color: COLORS.textDim,
     });

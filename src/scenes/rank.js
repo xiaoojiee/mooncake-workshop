@@ -64,7 +64,7 @@ scenes.register(
         const sel = rankState.board === t.board;
         uiPanel(ctx, tx + 6, tabY, tabW - 12, 56, {
           r: 12,
-          color: sel ? 'rgba(217,164,65,0.25)' : 'rgba(42,24,16,0.85)',
+          color: sel ? 'rgba(217,164,65,0.25)' : COLORS.panelInner,
           borderColor: sel ? COLORS.gold : 'rgba(217,164,65,0.3)',
           shadow: false,
         });
@@ -72,7 +72,7 @@ scenes.register(
           size: 18,
           weight: 700,
           align: 'center',
-          color: sel ? COLORS.goldLight : COLORS.textDim,
+          color: sel ? COLORS.panelTitle : COLORS.textDim,
         });
         rankState.buttons.push({ id: 'tab', value: t.board, x: tx + 6, y: tabY, w: tabW - 12, h: 56, label: '' });
       });
@@ -109,13 +109,13 @@ scenes.register(
           const mine = rankState.my && rankState.my.rank === it.rank && it.nickname === (rankState.my.nickname || it.nickname);
           if (mine) fillRoundRect(ctx, lx + 12, ry - 13, lw - 24, 26, 8, 'rgba(217,164,65,0.15)');
           const medal = ['🥇', '🥈', '🥉'][it.rank - 1] || String(it.rank);
-          drawText(ctx, medal, lx + 44, ry, { size: 16, weight: 700, align: 'center', color: COLORS.cream });
-          drawText(ctx, it.nickname || '匿名', lx + 120, ry, { size: 16, color: COLORS.cream });
+          drawText(ctx, medal, lx + 44, ry, { size: 16, weight: 700, align: 'center', color: COLORS.panelInk });
+          drawText(ctx, it.nickname || '匿名', lx + 120, ry, { size: 16, color: COLORS.panelInk });
           drawText(ctx, formatNum(it.score) + (rankTabs.find((t) => t.board === rankState.board).suffix || ''), lx + lw - 30, ry, {
             size: 16,
             weight: 600,
             align: 'right',
-            color: COLORS.goldLight,
+            color: COLORS.panelTitle,
           });
         });
       }
@@ -124,7 +124,7 @@ scenes.register(
       const myY = ly + lh + 16;
       uiPanel(ctx, lx, myY, lw, 74, { r: 14, shadow: false });
       const myLabel = rankState.my && rankState.my.ranked ? '我的排名：第 ' + rankState.my.rank + ' 名' : '我的成绩';
-      drawText(ctx, myLabel, lx + 30, myY + 26, { size: 18, weight: 700, color: COLORS.goldLight });
+      drawText(ctx, myLabel, lx + 30, myY + 26, { size: 18, weight: 700, color: COLORS.panelTitle });
       drawText(ctx, formatNum(currentScore(rankState.board)), lx + 30, myY + 52, {
         size: 14,
         color: COLORS.textDim,
