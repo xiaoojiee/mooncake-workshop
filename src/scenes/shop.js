@@ -891,7 +891,7 @@ function drawCounter(g) {
     /* 先垫一层木色底铺到画面底, 免得下半部分(制作台下方)露出背景图 */
     const back = g.createLinearGradient(0, surfaceTop - 8, 0, H);
     back.addColorStop(0, COLORS.panelDark);
-    back.addColorStop(1, '#341f16');
+    back.addColorStop(1, COLORS.counterFace3);
     g.fillStyle = back;
     g.fillRect(0, surfaceTop - 8, W, H - (surfaceTop - 8));
     g.drawImage(cimg, x, surfaceTop - 8, w, h);
@@ -900,13 +900,13 @@ function drawCounter(g) {
   }
 
   g.save();
-  const OUT = 'rgba(96,60,31,0.5)'; // 卡通描边色
+  const OUT = COLORS.counterOutline; // 卡通描边色
 
   /* 1) 地板底色: 从台面往下铺满, 免得露出星空 */
   const floor = g.createLinearGradient(0, surfaceTop - 10, 0, H);
-  floor.addColorStop(0, '#a4662e');
-  floor.addColorStop(0.28, '#8b5223');
-  floor.addColorStop(1, '#5d3416');
+  floor.addColorStop(0, COLORS.counterFloor1);
+  floor.addColorStop(0.28, COLORS.counterFloor2);
+  floor.addColorStop(1, COLORS.counterFloor3);
   g.fillStyle = floor;
   g.fillRect(0, surfaceTop - 10, W, H - (surfaceTop - 10));
 
@@ -921,18 +921,18 @@ function drawCounter(g) {
   const topY = surfaceTop - 8;
   const topH = edge - topY + 16;
   const topGrd = g.createLinearGradient(0, topY, 0, topY + topH);
-  topGrd.addColorStop(0, '#e8cfa2');
-  topGrd.addColorStop(0.35, '#d9b17a');
-  topGrd.addColorStop(1, '#b9834a');
+  topGrd.addColorStop(0, COLORS.counterTop1);
+  topGrd.addColorStop(0.35, COLORS.counterTop2);
+  topGrd.addColorStop(1, COLORS.counterTop3);
   fillRoundRect(g, -28, topY, W + 56, topH, 18, topGrd);
   g.save();
   g.globalAlpha = 0.4; // 顶面一道高光
-  fillRoundRect(g, -20, topY + 4, W + 40, 9, 6, '#fff3d6');
+  fillRoundRect(g, -20, topY + 4, W + 40, 9, 6, COLORS.counterTopHi);
   g.restore();
   /* 木纹竖线(稀疏, 暗示木板拼接) */
   g.save();
   g.globalAlpha = 0.12;
-  g.strokeStyle = '#6b3f1c';
+  g.strokeStyle = COLORS.counterWood;
   g.lineWidth = 2;
   for (let x = 60; x < W; x += 168) {
     g.beginPath();
@@ -944,25 +944,25 @@ function drawCounter(g) {
 
   /* 4) 前沿粗包边(琥珀金属) */
   const edgeGrd = g.createLinearGradient(0, edge - 4, 0, edge + 16);
-  edgeGrd.addColorStop(0, '#f0d79a');
+  edgeGrd.addColorStop(0, COLORS.counterEdge1);
   edgeGrd.addColorStop(0.35, COLORS.panelBorder);
-  edgeGrd.addColorStop(1, '#a76c1f');
+  edgeGrd.addColorStop(1, COLORS.counterEdge3);
   fillRoundRect(g, -28, edge - 4, W + 56, 20, 10, edgeGrd);
   g.save();
   g.globalAlpha = 0.45;
-  fillRoundRect(g, -22, edge - 1, W + 44, 4, 2, '#fff6dd');
+  fillRoundRect(g, -22, edge - 1, W + 44, 4, 2, COLORS.counterEdgeHi);
   g.restore();
 
   /* 5) 前沿立面 + 竖向木板缝 + 底部渐深 */
   const grd2 = g.createLinearGradient(0, edge + 16, 0, slabBot + 40);
-  grd2.addColorStop(0, '#8a4f22');
-  grd2.addColorStop(0.5, '#6f3d19');
-  grd2.addColorStop(1, '#4a2811');
+  grd2.addColorStop(0, COLORS.counterFace1);
+  grd2.addColorStop(0.5, COLORS.counterFace2);
+  grd2.addColorStop(1, COLORS.counterFace3);
   g.fillStyle = grd2;
   g.fillRect(0, edge + 16, W, H - (edge + 16));
   g.save();
   g.globalAlpha = 0.3;
-  g.strokeStyle = '#3a1f0d';
+  g.strokeStyle = COLORS.counterSeam;
   g.lineWidth = 3;
   for (let x = 120; x < W; x += 240) {
     g.beginPath();
@@ -973,7 +973,7 @@ function drawCounter(g) {
   g.restore();
   g.save();
   g.globalAlpha = 0.25;
-  g.strokeStyle = '#c08542';
+  g.strokeStyle = COLORS.counterSeamHi;
   g.lineWidth = 1.5;
   for (let x = 121; x < W; x += 240) {
     g.beginPath();

@@ -194,7 +194,7 @@ function drawFlipSign(g) {
 
   /* 吊绳: 放在翻转变换里, 跟着牌子一起翻 */
   g.save();
-  g.strokeStyle = 'rgba(196,158,86,0.75)';
+  g.strokeStyle = COLORS.panelBorder;
   g.lineWidth = 4;
   g.beginPath();
   g.moveTo(cx - SIGN.w / 2 + 40, 70);

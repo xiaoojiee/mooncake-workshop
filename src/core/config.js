@@ -43,7 +43,116 @@ const COLORS = {
   custard: '#d0a952',
   crust: '#cea26e',
   icy: '#c2d7e2',
+
+  /* ---- 主题化的渐变/控件色(闭店关灯时整套换掉) ---- */
+  gloss: '#fdfcf4', // 面板顶面高光
+  btnTop: '#eac17b',
+  btnMid: '#d79d55',
+  btnBot: '#bf7e3b',
+  btnTopOn: '#ebc985',
+  btnMidOn: '#daa04b',
+  btnBotOn: '#c17c2f',
+  borderTop: '#eccc8d',
+  borderMid: '#ca883f',
+  borderBot: '#a96626',
+  btnInk: '#8f5c26', // 按钮文字描边
+  shadow: 'rgba(96,60,31,0.32)',
+  headerTop: '#d9a35a',
+  headerBot: '#c17c2f',
+
+  /* 柜台/地板 */
+  counterFloor1: '#a4662e',
+  counterFloor2: '#8b5223',
+  counterFloor3: '#5d3416',
+  counterTop1: '#e8cfa2',
+  counterTop2: '#d9b17a',
+  counterTop3: '#b9834a',
+  counterTopHi: '#fff3d6',
+  counterEdge1: '#f0d79a',
+  counterEdge3: '#a76c1f',
+  counterEdgeHi: '#fff6dd',
+  counterFace1: '#8a4f22',
+  counterFace2: '#6f3d19',
+  counterFace3: '#4a2811',
+  counterSeam: '#3a1f0d',
+  counterSeamHi: '#c08542',
+  counterWood: '#6b3f1c',
+  counterOutline: 'rgba(96,60,31,0.5)',
 };
+
+/* ---- 双主题: 日(营业/开灯) / 夜(闭店/关灯) ----
+ * setTheme 会把对应色值整体覆写进 COLORS, 所以所有绘制处都自动跟着变 */
+const COLORS_DAY = Object.assign({}, COLORS);
+const COLORS_NIGHT = Object.assign({}, COLORS, {
+  bg: '#141220',
+  bgWarm: '#242135',
+  bgWarmDeep: '#100e1a',
+
+  panel: '#3a322c',
+  panelLight: '#4a3f37',
+  panelDark: '#2c2621',
+  panelInner: '#332c27',
+  panelBorder: '#7c6444',
+  panelInk: '#f2e6d0',
+  panelInkDim: '#b8a78c',
+  panelTitle: '#dcb277',
+
+  gold: '#c2a04f',
+  goldLight: '#e6cf95',
+  cream: '#f4e8d2',
+  creamDim: '#d5c2a0',
+  text: '#f2e6d0',
+  textDim: '#b8a78c',
+  ok: '#6f9655',
+  warn: '#c09453',
+  fail: '#b06a5c',
+
+  gloss: 'rgba(255,255,255,0.10)',
+  btnTop: '#64513c',
+  btnMid: '#4c3c2c',
+  btnBot: '#382c20',
+  btnTopOn: '#77614a',
+  btnMidOn: '#5a4835',
+  btnBotOn: '#423426',
+  borderTop: '#8f7048',
+  borderMid: '#6b5230',
+  borderBot: '#443119',
+  btnInk: '#1c150e',
+  shadow: 'rgba(0,0,0,0.35)',
+  headerTop: '#3a3040',
+  headerBot: '#241d29',
+
+  counterFloor1: '#4a3a2c',
+  counterFloor2: '#3c2e23',
+  counterFloor3: '#241b14',
+  counterTop1: '#6b5a48',
+  counterTop2: '#574839',
+  counterTop3: '#42362b',
+  counterTopHi: 'rgba(255,240,210,0.16)',
+  counterEdge1: '#8a6f4a',
+  counterEdge3: '#4a3720',
+  counterEdgeHi: 'rgba(255,236,196,0.22)',
+  counterFace1: '#3f3226',
+  counterFace2: '#33281e',
+  counterFace3: '#1f1811',
+  counterSeam: '#161009',
+  counterSeamHi: '#5c4830',
+  counterWood: '#2a2016',
+  counterOutline: 'rgba(12,8,4,0.55)',
+});
+
+let themeName = 'day';
+function currentTheme() {
+  return themeName;
+}
+/* 切换主题: 'day' | 'night'; 同主题重复调用直接返回 */
+function setTheme(name) {
+  const next = name === 'night' ? 'night' : 'day';
+  if (next === themeName) return;
+  const src = next === 'night' ? COLORS_NIGHT : COLORS_DAY;
+  for (const k in src) COLORS[k] = src[k];
+  themeName = next;
+}
 
 /* ---- 操作台尺寸(逻辑坐标) ---- */
 const LAYOUT = {

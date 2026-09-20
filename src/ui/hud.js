@@ -4,7 +4,7 @@
  * 全部为立即模式(immediate mode), 由场景每帧绘制并自行处理点击 */
 
 /* global COLORS, input, isUnlocked, img, drawSprite, drawNine, formatNum, SFX, W, H, LAYOUT,
-   shop, pointInRect, fillRoundRect, strokeRoundRect, drawText, clamp, BG, clock */
+   shop, pointInRect, fillRoundRect, strokeRoundRect, drawText, clamp, BG, clock, currentTheme */
 
 /* 面板底色: 竖向「顶亮→底暗」渐变(奶油/塑料质感) */
 function panelBody(g, x, y, w, h, base) {
@@ -19,22 +19,22 @@ function panelBody(g, x, y, w, h, base) {
 function buttonBody(g, x, y, w, h, active) {
   const grd = g.createLinearGradient(x, y, x, y + h);
   if (active) {
-    grd.addColorStop(0, '#ebc985');
-    grd.addColorStop(0.5, '#daa04b');
-    grd.addColorStop(1, '#c17c2f');
+    grd.addColorStop(0, COLORS.btnTopOn);
+    grd.addColorStop(0.5, COLORS.btnMidOn);
+    grd.addColorStop(1, COLORS.btnBotOn);
   } else {
-    grd.addColorStop(0, '#eac17b');
-    grd.addColorStop(0.5, '#d79d55');
-    grd.addColorStop(1, '#bf7e3b');
+    grd.addColorStop(0, COLORS.btnTop);
+    grd.addColorStop(0.5, COLORS.btnMid);
+    grd.addColorStop(1, COLORS.btnBot);
   }
   return grd;
 }
 /* 包边: 上亮金 → 下深橙(琥珀) */
 function metalBorder(g, x, y, w, h) {
   const grd = g.createLinearGradient(x, y, x, y + h);
-  grd.addColorStop(0, '#eccc8d');
+  grd.addColorStop(0, COLORS.borderTop);
   grd.addColorStop(0.45, COLORS.panelBorder);
-  grd.addColorStop(1, '#a96626');
+  grd.addColorStop(1, COLORS.borderBot);
   return grd;
 }
 /* 粗包边(外圈深色刻画线 + 内圈细高光), 卡通描边风 */
@@ -42,12 +42,12 @@ function strokeMetal(g, x, y, w, h, r, width) {
   const bw = width || 5;
   g.save();
   g.globalAlpha = 0.22; // 外圈深色刻画线, 拉开层次
-  strokeRoundRect(g, x - 1.5, y - 1.5, w + 3, h + 3, r + 1.5, '#603c1f', bw * 0.7);
+  strokeRoundRect(g, x - 1.5, y - 1.5, w + 3, h + 3, r + 1.5, COLORS.btnInk, bw * 0.7);
   g.restore();
   strokeRoundRect(g, x, y, w, h, r, metalBorder(g, x, y, w, h), bw);
   g.save();
   g.globalAlpha = 0.7; // 内圈细白高光
-  g.strokeStyle = '#fdfcf4';
+  g.strokeStyle = COLORS.gloss;
   g.lineWidth = 1.6;
   roundRect(g, x + bw * 0.72, y + bw * 0.72, w - bw * 1.44, h - bw * 1.44, Math.max(2, r - bw * 0.72));
   g.stroke();
@@ -74,11 +74,11 @@ function uiButton(g, b) {
 
   /* 按钮: 橙色渐变 + 顶部高光带 + 粗包边(悬停/按下更亮) */
   const rr = b.r || 14;
-  fillRoundRect(g, x, y + 5, b.w, b.h, rr, 'rgba(96,60,31,0.32)');
+  fillRoundRect(g, x, y + 5, b.w, b.h, rr, COLORS.shadow);
   fillRoundRect(g, x, y, b.w, b.h, rr, buttonBody(g, x, y, b.w, b.h, (hover || pressed) && !disabled));
   g.save();
   g.globalAlpha = 0.4;
-  fillRoundRect(g, x + rr * 0.55, y + 3, Math.max(8, b.w - rr * 1.1), Math.max(5, b.h * 0.28), rr * 0.55, '#ffffff');
+  fillRoundRect(g, x + rr * 0.55, y + 3, Math.max(8, b.w - rr * 1.1), Math.max(5, b.h * 0.28), rr * 0.55, COLORS.gloss);
   g.restore();
   if (b.accent) strokeRoundRect(g, x, y, b.w, b.h, rr, b.accent, 4);
   else strokeMetal(g, x, y, b.w, b.h, rr, 4);
@@ -86,7 +86,7 @@ function uiButton(g, b) {
   /* 文字: 奶油字 + 深橙描边(卡通感) */
   const cx = x + b.w / 2;
   const cy = y + b.h / 2;
-  const outline = '#8f5c26';
+  const outline = COLORS.btnInk;
   if (b.sublabel) {
     drawText(g, b.label, cx, cy - 10, {
       size: b.size || 20, weight: 700, align: 'center',
@@ -134,7 +134,7 @@ function uiPanel(g, x, y, w, h, opts) {
   const r = o.r || 18;
   g.save();
   if (o.shadow !== false) {
-    g.shadowColor = 'rgba(79,46,21,0.35)';
+    g.shadowColor = COLORS.shadow;
     g.shadowBlur = 16;
     g.shadowOffsetY = 5;
   }
@@ -148,7 +148,7 @@ function uiPanel(g, x, y, w, h, opts) {
   if (o.gloss !== false) {
     g.save();
     g.globalAlpha = 0.3;
-    fillRoundRect(g, x + r * 0.4, y + 4, Math.max(10, w - r * 0.8), Math.max(6, h * 0.07), r * 0.4, '#ffffff');
+    fillRoundRect(g, x + r * 0.4, y + 4, Math.max(10, w - r * 0.8), Math.max(6, h * 0.07), r * 0.4, COLORS.gloss);
     g.restore();
   }
 }
@@ -166,34 +166,34 @@ function uiHeader(g, opts) {
   g.save();
   /* 暖橙横条 + 底部亮边(压在背景上, 卡通感) */
   const bar = g.createLinearGradient(0, 0, 0, LAYOUT.headerH);
-  bar.addColorStop(0, '#d9a35a');
-  bar.addColorStop(1, '#c17c2f');
+  bar.addColorStop(0, COLORS.headerTop);
+  bar.addColorStop(1, COLORS.btnBotOn);
   g.fillStyle = bar;
   g.fillRect(0, 0, W, LAYOUT.headerH);
-  g.fillStyle = 'rgba(96,60,31,0.7)';
+  g.fillStyle = COLORS.shadow;
   g.fillRect(0, 0, W, 3);
-  g.fillStyle = 'rgba(242,221,173,0.85)';
+  g.fillStyle = COLORS.gloss;
   g.fillRect(0, LAYOUT.headerH - 4, W, 4);
-  g.fillStyle = 'rgba(96,60,31,0.25)';
+  g.fillStyle = COLORS.shadow;
   g.fillRect(0, LAYOUT.headerH - 7, W, 3);
 
   /* 左侧留给全局背包 / 调试按钮 */
   drawText(g, o.title || '月饼工坊', 248, LAYOUT.headerH / 2, {
-    size: 30, weight: 700, color: COLORS.cream, stroke: '#8f5c26', strokeWidth: 4,
+    size: 30, weight: 700, color: COLORS.cream, stroke: COLORS.btnInk, strokeWidth: 4,
   });
 
   /* 金币 */
   const rx = W - 28;
   drawSprite(g, 'ui_coin', rx - 200, LAYOUT.headerH / 2 - 17, 34, 34);
   drawText(g, formatNum(shop.coins), rx - 155, LAYOUT.headerH / 2, {
-    size: 24, weight: 700, color: COLORS.cream, stroke: '#8f5c26', strokeWidth: 3.5,
+    size: 24, weight: 700, color: COLORS.cream, stroke: COLORS.btnInk, strokeWidth: 3.5,
   });
   drawText(g, '第 ' + shop.day + ' 天', rx - 20, LAYOUT.headerH / 2 - 12, {
     size: 18,
     weight: 700,
     align: 'right',
     color: COLORS.cream,
-    stroke: '#8f5c26',
+    stroke: COLORS.btnInk,
     strokeWidth: 3,
   });
   drawText(g, '口碑 ' + shop.reputation, rx - 20, LAYOUT.headerH / 2 + 14, {
@@ -201,7 +201,7 @@ function uiHeader(g, opts) {
     weight: 600,
     align: 'right',
     color: COLORS.creamDim,
-    stroke: '#8f5c26',
+    stroke: COLORS.btnInk,
     strokeWidth: 2.5,
   });
   g.restore();
@@ -223,7 +223,7 @@ function drawFallbackBg(g) {
   /* 暖橙底, 和奶油面板/橙色按钮统一 */
   const bg = g.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, COLORS.bgWarm);
-  bg.addColorStop(0.55, '#d1924a');
+  bg.addColorStop(0.55, COLORS.bgWarm);
   bg.addColorStop(1, COLORS.bgWarmDeep);
   g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
@@ -355,7 +355,8 @@ function drawNightSky(g, dim) {
 /* 画背景: 默认程序化星空圆月; BG.sky=false 时走贴图(cover 铺满 + 可上下提拉对位) */
 function drawBg(g, key) {
   if (BG.sky !== false) {
-    drawNightSky(g, key === 'bg_closed');
+    /* 闭店(夜主题)时整片天也压暗, 和暗色 UI 呼应 */
+    drawNightSky(g, key === 'bg_closed' || currentTheme() === 'night');
     return;
   }
   const i = img(key);
