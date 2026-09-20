@@ -205,6 +205,7 @@ const COUNTER = {
 /* ---- 工厂 ---- */
 const FACTORY_TICK = 0.5; // 产线结算步长(秒)
 const STOCK_START_RATIO = 0.5; // 开局库存占容量比例
+const START_MATERIAL_EACH = 5; // 开局赠送的启动材料: 初始饼皮 + 初始馅料, 每种各 5 个
 /* 取货: 从工厂面板把原料搬到原料架, 每次可连续取 */
 const FETCH = {
   batch: 1, // 每次点击取 1 份

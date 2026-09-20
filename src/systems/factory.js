@@ -22,7 +22,8 @@
 /* global shop, run, FACTORIES, UPGRADES, STOCK_START_RATIO, FACTORY_TICK, FETCH, COLORS,
    OVEN, ASSEMBLY, COUNTER, COUNTER_LABEL, CORE, PRODUCE, createOvenSlot, createSlot,
    addFloater, SFX, saveGame, findComponentDef, findFactoryDef, isComponentAllowed,
-   componentRestrictLabel, computeFactoryStats, slotCost, componentUpgradeCost, MAX_SLOTS */
+   componentRestrictLabel, computeFactoryStats, slotCost, componentUpgradeCost, MAX_SLOTS,
+   CRUSTS, FILLINGS, START_MATERIAL_EACH */
 
 /* ---- 5×5 网格 ---- */
 const GRID = { size: 5, core: 12 };
@@ -92,7 +93,10 @@ function initFactories(saved) {
 
   for (const s of STARTER_UNITS) addUnit(s.factoryId, s.cell);
   for (const fid in STARTER_CARDS) shop.factoryBag[fid] = STARTER_CARDS[fid];
-  /* 背包从空开始: 开业前用「备货」自己买, 不再白送工厂产物 */
+  /* 开局赠送一小撮启动材料: 初始饼皮(糖浆皮) + 初始馅料(五仁/莲蓉), 每种各 5 个
+   * 只在新档生效: 有存档时下面 applyFactorySave 会覆盖掉这里 */
+  for (const c of CRUSTS) if (!c.unlock) backpackAdd('crust', c.id, START_MATERIAL_EACH);
+  for (const f of FILLINGS) if (!f.unlock) backpackAdd('filling', f.id, START_MATERIAL_EACH);
 
   if (saved) applyFactorySave(saved);
   refreshAllFactories();

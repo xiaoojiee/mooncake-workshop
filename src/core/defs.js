@@ -114,10 +114,10 @@ const FILLINGS = [
  * cost: 工厂卡片的购买价(卖出价 = cost 的一半, 见 sellFactory) */
 const FACTORIES = [
   /* 饼皮(初始产速很低, 全靠组件/升级拉起来) */
-  { id: 'factory_crust_guangshi', kind: 'crust', productId: 'guangshi', name: '糖浆皮工坊', baseSpeed: 0.05, baseCapacity: 12, baseQuality: 1, cost: 375 },
-  { id: 'factory_crust_naihuang', kind: 'crust', productId: 'naihuang', name: '奶黄皮工坊', baseSpeed: 0.07, baseCapacity: 10, baseQuality: 1, cost: 425 },
-  { id: 'factory_crust_matcha', kind: 'crust', productId: 'matcha', name: '抹茶工坊', baseSpeed: 0.06, baseCapacity: 10, baseQuality: 2, cost: 475 },
-  { id: 'factory_crust_choco', kind: 'crust', productId: 'choco', name: '巧克力工坊', baseSpeed: 0.05, baseCapacity: 8, baseQuality: 2, cost: 525 },
+  { id: 'factory_crust_guangshi', kind: 'crust', productId: 'guangshi', name: '糖浆皮工坊', baseSpeed: 0.09, baseCapacity: 12, baseQuality: 1, cost: 375 },
+  { id: 'factory_crust_naihuang', kind: 'crust', productId: 'naihuang', name: '奶黄皮工坊', baseSpeed: 0.085, baseCapacity: 10, baseQuality: 1, cost: 425 },
+  { id: 'factory_crust_matcha', kind: 'crust', productId: 'matcha', name: '抹茶工坊', baseSpeed: 0.075, baseCapacity: 10, baseQuality: 2, cost: 475 },
+  { id: 'factory_crust_choco', kind: 'crust', productId: 'choco', name: '巧克力工坊', baseSpeed: 0.065, baseCapacity: 8, baseQuality: 2, cost: 525 },
   /* 正经馅料 */
   { id: 'factory_filling_wuren', kind: 'filling', productId: 'wuren', name: '五仁产线', baseSpeed: 0.085, baseCapacity: 18, baseQuality: 1, cost: 375 },
   { id: 'factory_filling_lianrong', kind: 'filling', productId: 'lianrong', name: '莲蓉产线', baseSpeed: 0.065, baseCapacity: 16, baseQuality: 1, cost: 400 },
