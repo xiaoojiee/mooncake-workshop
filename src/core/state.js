@@ -19,6 +19,7 @@ const shop = {
   ovenLevel: 1, // 烤位等级(决定 run.oven 数量)
   coreLevel: 1, // 能源核心等级(决定总电量)
   autoSlots: [], // 已升级为「自动」的制作台槽位下标
+  welcomeGift: false, // 是否已发过开局启动材料(每档只发一次)
   counter: { boiler: 0, tray: 0, cart: 0, autoBake: 0 }, // 柜台升级等级
   items: [], // 持有的特殊道具
   stats: {

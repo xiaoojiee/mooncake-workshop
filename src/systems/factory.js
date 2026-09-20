@@ -93,12 +93,17 @@ function initFactories(saved) {
 
   for (const s of STARTER_UNITS) addUnit(s.factoryId, s.cell);
   for (const fid in STARTER_CARDS) shop.factoryBag[fid] = STARTER_CARDS[fid];
-  /* 开局赠送一小撮启动材料: 初始饼皮(糖浆皮) + 初始馅料(五仁/莲蓉), 每种各 5 个
-   * 只在新档生效: 有存档时下面 applyFactorySave 会覆盖掉这里 */
-  for (const c of CRUSTS) if (!c.unlock) backpackAdd('crust', c.id, START_MATERIAL_EACH);
-  for (const f of FILLINGS) if (!f.unlock) backpackAdd('filling', f.id, START_MATERIAL_EACH);
 
   if (saved) applyFactorySave(saved);
+
+  /* 启动材料: 初始饼皮 + 初始馅料, 每种各 5 个
+   * 必须在「读档」之后发, 否则会被存档里的背包覆盖;
+   * 用 shop.welcomeGift 标记保证每个档只发一次(老存档没有该标记 -> 补发一次) */
+  if (!shop.welcomeGift) {
+    for (const c of CRUSTS) if (!c.unlock) backpackAdd('crust', c.id, START_MATERIAL_EACH);
+    for (const f of FILLINGS) if (!f.unlock) backpackAdd('filling', f.id, START_MATERIAL_EACH);
+    shop.welcomeGift = true;
+  }
   refreshAllFactories();
 }
 

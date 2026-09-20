@@ -25,6 +25,7 @@ function buildSaveParts() {
     autoSlots: shop.autoSlots || [],
     counter: shop.counter || { boiler: 0, tray: 0, cart: 0, autoBake: 0 },
     stats: shop.stats,
+    welcomeGift: shop.welcomeGift === true,
   };
   /* 已上场的工厂实例 */
   const units = {};
@@ -84,6 +85,7 @@ function applySaveParts(parts) {
   shop.autoSlots = meta.autoSlots || [];
   shop.counter = meta.counter || { boiler: 0, tray: 0, cart: 0, autoBake: 0 };
   shop.stats = meta.stats || { served: 0, failed: 0, perfect: 0, totalCoins: 0 };
+  shop.welcomeGift = meta.welcomeGift === true; // 老存档没有该字段 -> false(会补发一次启动材料)
   initFactories({
     backpack: factory ? factory.backpack : null,
     components: factory ? factory.components : null,
@@ -164,6 +166,7 @@ function resetGame() {
     localStorage.removeItem(LOCAL_SAVE_KEY);
   } catch (_) {}
   shop.components = {};
+  shop.welcomeGift = false; // 必须在 initFactories 之前清, 否则新档发不出启动材料
   initFactories(null);
   shop.day = 1;
   shop.coins = 200;
