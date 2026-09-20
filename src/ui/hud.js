@@ -4,7 +4,8 @@
  * 全部为立即模式(immediate mode), 由场景每帧绘制并自行处理点击 */
 
 /* global COLORS, input, isUnlocked, img, drawSprite, drawNine, formatNum, SFX, W, H, LAYOUT,
-   shop, pointInRect, fillRoundRect, strokeRoundRect, drawText, clamp, BG, clock, currentTheme */
+   shop, run, DAY, pointInRect, fillRoundRect, strokeRoundRect, drawText, clamp, BG, clock,
+   currentTheme */
 
 /* 面板底色: 竖向「顶亮→底暗」渐变(奶油/塑料质感) */
 function panelBody(g, x, y, w, h, base) {
@@ -266,6 +267,15 @@ const MOON_CRATERS = [
   [0.12, 0.46, 0.08],
 ];
 
+/* 一天的进度: 0 = 刚开门(月亮在东边/左), 1 = 打烊(月亮走到西边/右)
+ * 没在营业(开始界面/工厂/排行榜)时按「已打烊」处理 = 1 */
+function moonProgress() {
+  const dur = (typeof DAY === 'object' && DAY && DAY.duration) || 90;
+  const left = (typeof run === 'object' && run && run.dayTimeLeft) || 0;
+  if (left <= 0) return 1;
+  return clamp(1 - left / dur, 0, 1);
+}
+
 function drawNightSky(g, dim) {
   g.save();
 
@@ -299,9 +309,10 @@ function drawNightSky(g, dim) {
   }
   g.globalAlpha = 1;
 
-  /* 圆月 + 光晕 */
-  const mx = W / 2;
-  const my = 102;
+  /* 圆月 + 光晕: 位置跟着一天的进度从左划到右(中段升到最高) */
+  const mp = moonProgress();
+  const mx = W * 0.12 + W * 0.76 * mp;
+  const my = 172 - Math.sin(mp * Math.PI) * 58;
   const mr = 50;
   const halo = g.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * 4.6);
   halo.addColorStop(0, 'rgba(255,246,214,0.5)');
