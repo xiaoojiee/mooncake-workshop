@@ -23,7 +23,7 @@
    createOvenSlot, ovenPut, ovenTake, ovenDone, ovenBurnt, bakeGrade, drawSlotMoon,
    drawFillingBubble, drawCrustPart, drawFillingIcon, drawNpc, fillingIndexOf,
    findCrustDef, findFillingDef, CRUSTS, FILLINGS, isUnlocked, uiHeader, uiPanel, uiButton,
-   uiBar, drawText, wrapText, hitButton, pointInRect, dist, SFX, drawBg, drawFallbackBg, addShake,
+   uiBar, drawText, wrapText, hitButton, pointInRect, dist, SFX, drawBg, drawFallbackBg, addShake, BG,
    showScreenText, formatNum, formatTime, saveGame, backpackCount, backpackTake, backpackAdd,
    applyOvenUpgrade, upgradesFor, interact,
    findComponentDef, COMPONENT_TYPES, buySlot, installComponent, removeComponent,
@@ -878,9 +878,10 @@ function drawCounter(g) {
   const surfaceTop = edge - 26; // 台面后沿
   const slabBot = edge + 46; // 柜台前沿立面的底
 
-  /* 有柜台贴图: 整条只画一次, 铺满宽度(下半部分正好当制作台背景, 不再平铺) */
+  /* 有柜台贴图: 整条只画一次, 铺满宽度(下半部分正好当制作台背景, 不再平铺)
+   * BG.counterProcedural = true 时改用下面的程序化柜台(暂代美术) */
   const cimg = img('counter');
-  if (cimg) {
+  if (cimg && BG.counterProcedural !== true) {
     const iw = cimg.naturalWidth || cimg.width;
     const ih = cimg.naturalHeight || cimg.height;
     const w = W * 1.12; // 稍微放大(两侧裁掉一点)
@@ -899,25 +900,95 @@ function drawCounter(g) {
   }
 
   g.save();
-  /* 台面(#8b533d -> #6d402f, 和面板同色系) */
-  const grd = g.createLinearGradient(0, surfaceTop, 0, edge);
-  grd.addColorStop(0, COLORS.panelLight);
-  grd.addColorStop(1, COLORS.panel);
-  g.fillStyle = grd;
-  g.fillRect(0, surfaceTop, W, edge - surfaceTop);
-  /* 前沿金色包边(金属反光) */
-  const edgeGrd = g.createLinearGradient(0, edge, W, edge);
-  edgeGrd.addColorStop(0, '#f3e3b4');
-  edgeGrd.addColorStop(0.5, COLORS.panelBorder);
-  edgeGrd.addColorStop(1, '#a07c23');
-  g.fillStyle = edgeGrd;
-  g.fillRect(0, edge, W, 4);
-  /* 柜台前沿立面(#533023 -> #341f16) */
-  const grd2 = g.createLinearGradient(0, edge + 4, 0, slabBot);
-  grd2.addColorStop(0, COLORS.panelDark);
-  grd2.addColorStop(1, '#341f16');
+  const OUT = 'rgba(96,60,31,0.5)'; // 卡通描边色
+
+  /* 1) 地板底色: 从台面往下铺满, 免得露出星空 */
+  const floor = g.createLinearGradient(0, surfaceTop - 10, 0, H);
+  floor.addColorStop(0, '#a4662e');
+  floor.addColorStop(0.28, '#8b5223');
+  floor.addColorStop(1, '#5d3416');
+  g.fillStyle = floor;
+  g.fillRect(0, surfaceTop - 10, W, H - (surfaceTop - 10));
+
+  /* 2) 柜台面上的投影(客人/物品压在台面上) */
+  const shade = g.createLinearGradient(0, surfaceTop - 10, 0, edge);
+  shade.addColorStop(0, 'rgba(60,30,10,0.34)');
+  shade.addColorStop(1, 'rgba(60,30,10,0)');
+  g.fillStyle = shade;
+  g.fillRect(0, surfaceTop - 10, W, edge - (surfaceTop - 10));
+
+  /* 3) 台面: 圆角长条, 木色, 顶亮底暗 + 顶面高光 */
+  const topY = surfaceTop - 8;
+  const topH = edge - topY + 16;
+  const topGrd = g.createLinearGradient(0, topY, 0, topY + topH);
+  topGrd.addColorStop(0, '#e8cfa2');
+  topGrd.addColorStop(0.35, '#d9b17a');
+  topGrd.addColorStop(1, '#b9834a');
+  fillRoundRect(g, -28, topY, W + 56, topH, 18, topGrd);
+  g.save();
+  g.globalAlpha = 0.4; // 顶面一道高光
+  fillRoundRect(g, -20, topY + 4, W + 40, 9, 6, '#fff3d6');
+  g.restore();
+  /* 木纹竖线(稀疏, 暗示木板拼接) */
+  g.save();
+  g.globalAlpha = 0.12;
+  g.strokeStyle = '#6b3f1c';
+  g.lineWidth = 2;
+  for (let x = 60; x < W; x += 168) {
+    g.beginPath();
+    g.moveTo(x, topY + 6);
+    g.lineTo(x, topY + topH - 4);
+    g.stroke();
+  }
+  g.restore();
+
+  /* 4) 前沿粗包边(琥珀金属) */
+  const edgeGrd = g.createLinearGradient(0, edge - 4, 0, edge + 16);
+  edgeGrd.addColorStop(0, '#f0d79a');
+  edgeGrd.addColorStop(0.35, COLORS.panelBorder);
+  edgeGrd.addColorStop(1, '#a76c1f');
+  fillRoundRect(g, -28, edge - 4, W + 56, 20, 10, edgeGrd);
+  g.save();
+  g.globalAlpha = 0.45;
+  fillRoundRect(g, -22, edge - 1, W + 44, 4, 2, '#fff6dd');
+  g.restore();
+
+  /* 5) 前沿立面 + 竖向木板缝 + 底部渐深 */
+  const grd2 = g.createLinearGradient(0, edge + 16, 0, slabBot + 40);
+  grd2.addColorStop(0, '#8a4f22');
+  grd2.addColorStop(0.5, '#6f3d19');
+  grd2.addColorStop(1, '#4a2811');
   g.fillStyle = grd2;
-  g.fillRect(0, edge + 4, W, slabBot - edge - 4);
+  g.fillRect(0, edge + 16, W, H - (edge + 16));
+  g.save();
+  g.globalAlpha = 0.3;
+  g.strokeStyle = '#3a1f0d';
+  g.lineWidth = 3;
+  for (let x = 120; x < W; x += 240) {
+    g.beginPath();
+    g.moveTo(x, edge + 18);
+    g.lineTo(x, H);
+    g.stroke();
+  }
+  g.restore();
+  g.save();
+  g.globalAlpha = 0.25;
+  g.strokeStyle = '#c08542';
+  g.lineWidth = 1.5;
+  for (let x = 121; x < W; x += 240) {
+    g.beginPath();
+    g.moveTo(x, edge + 18);
+    g.lineTo(x, H);
+    g.stroke();
+  }
+  g.restore();
+
+  /* 6) 卡通轮廓线: 台面 + 前沿各描一圈 */
+  g.save();
+  g.globalAlpha = 0.5;
+  strokeRoundRect(g, -28, topY, W + 56, topH, 18, OUT, 2.5);
+  strokeRoundRect(g, -28, edge - 4, W + 56, 20, 10, OUT, 2);
+  g.restore();
   g.restore();
 }
 

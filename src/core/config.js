@@ -82,6 +82,8 @@ const BG = {
   zoom: 1,
   offsetY: -0.3,
   offsetX: 0,
+  sky: true, // 程序化「星空+圆月」背景(暂代背景贴图); false = 用贴图
+  counterProcedural: true, // 程序化柜台(暂代 柜台.png); false = 用贴图
 };
 
 /* ---- 组装规则 ----

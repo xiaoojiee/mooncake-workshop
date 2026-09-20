@@ -4,7 +4,7 @@
  * 全部为立即模式(immediate mode), 由场景每帧绘制并自行处理点击 */
 
 /* global COLORS, input, isUnlocked, img, drawSprite, drawNine, formatNum, SFX, W, H, LAYOUT,
-   shop, pointInRect, fillRoundRect, strokeRoundRect, drawText, clamp, BG */
+   shop, pointInRect, fillRoundRect, strokeRoundRect, drawText, clamp, BG, clock */
 
 /* 面板底色: 竖向「顶亮→底暗」渐变(奶油/塑料质感) */
 function panelBody(g, x, y, w, h, base) {
@@ -235,8 +235,129 @@ function drawFallbackBg(g) {
   g.fillRect(0, 0, W, H);
 }
 
-/* 画背景贴图: cover 铺满(不拉伸变形) + 可上下提拉对位; 缺失时退回渐变并标注 key */
+/* ---- 程序化背景: 星空 + 圆月(暂代背景贴图, BG.sky 关掉即回退贴图) ---- */
+
+/* 星星位置固定(用定种子伪随机生成一次, 免得每帧乱跳) */
+let _stars = null;
+function bgStars() {
+  if (_stars) return _stars;
+  _stars = [];
+  let seed = 20260920;
+  const rnd = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  for (let i = 0; i < 150; i++) {
+    _stars.push({
+      x: rnd() * W,
+      y: rnd() * H * 0.66,
+      r: 0.6 + rnd() * 1.7,
+      a: 0.3 + rnd() * 0.7,
+      tw: rnd() * Math.PI * 2, // 闪烁相位
+    });
+  }
+  return _stars;
+}
+
+/* 环形山(相对月心的偏移/半径比例) */
+const MOON_CRATERS = [
+  [-0.30, -0.28, 0.18], [0.24, -0.34, 0.12], [0.34, 0.16, 0.16],
+  [-0.16, 0.34, 0.13], [0.02, -0.06, 0.10], [-0.46, 0.08, 0.09],
+  [0.12, 0.46, 0.08],
+];
+
+function drawNightSky(g, dim) {
+  g.save();
+
+  /* 夜空: 深靛蓝 -> 紫 -> 暖橙地平线(和暖色 UI 衔接) */
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#141a3c');
+  sky.addColorStop(0.34, '#2e2c58');
+  sky.addColorStop(0.62, '#6b4a63');
+  sky.addColorStop(0.82, '#a4694a');
+  sky.addColorStop(1, '#c98a4a');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, W, H);
+
+  /* 银河雾带(斜向柔光) */
+  const milky = g.createLinearGradient(W * 0.1, 0, W * 0.9, H * 0.7);
+  milky.addColorStop(0, 'rgba(180,190,255,0)');
+  milky.addColorStop(0.5, 'rgba(180,190,255,0.10)');
+  milky.addColorStop(1, 'rgba(180,190,255,0)');
+  g.fillStyle = milky;
+  g.fillRect(0, 0, W, H * 0.8);
+
+  /* 星星(带闪烁) */
+  const t = (typeof clock === 'object' && clock && clock.time) || 0;
+  for (const s of bgStars()) {
+    const tw = 0.72 + 0.28 * Math.sin(t * 1.7 + s.tw);
+    g.globalAlpha = s.a * tw;
+    g.fillStyle = '#fff6dd';
+    g.beginPath();
+    g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.globalAlpha = 1;
+
+  /* 圆月 + 光晕 */
+  const mx = W / 2;
+  const my = 102;
+  const mr = 50;
+  const halo = g.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * 4.6);
+  halo.addColorStop(0, 'rgba(255,246,214,0.5)');
+  halo.addColorStop(0.4, 'rgba(255,232,180,0.16)');
+  halo.addColorStop(1, 'rgba(255,232,180,0)');
+  g.fillStyle = halo;
+  g.fillRect(mx - mr * 5, my - mr * 5, mr * 10, mr * 10);
+
+  g.beginPath();
+  g.arc(mx, my, mr, 0, Math.PI * 2);
+  const moon = g.createRadialGradient(mx - mr * 0.32, my - mr * 0.38, mr * 0.1, mx, my, mr * 1.05);
+  moon.addColorStop(0, '#fffdf0');
+  moon.addColorStop(0.62, '#f8ecc6');
+  moon.addColorStop(1, '#e3cf9c');
+  g.fillStyle = moon;
+  g.fill();
+
+  /* 环形山 */
+  for (const [dx, dy, r] of MOON_CRATERS) {
+    g.beginPath();
+    g.arc(mx + dx * mr, my + dy * mr, r * mr, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(184,152,98,0.18)';
+    g.fill();
+  }
+  /* 月缘冷光 */
+  g.beginPath();
+  g.arc(mx, my, mr - 0.5, 0, Math.PI * 2);
+  g.strokeStyle = 'rgba(255,252,232,0.75)';
+  g.lineWidth = 2;
+  g.stroke();
+
+  /* 低空云带(几缕, 压在地平线附近) */
+  g.globalAlpha = 0.22;
+  g.fillStyle = '#ffe6bd';
+  const clouds = [[-60, 470, 420, 34], [520, 512, 520, 40], [980, 452, 460, 30]];
+  for (const [cx, cy, cw, ch] of clouds) {
+    g.beginPath();
+    g.ellipse(cx, cy, cw / 2, ch / 2, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.globalAlpha = 1;
+
+  /* 打烊/结算: 整体压暗 */
+  if (dim) {
+    g.fillStyle = 'rgba(10,14,34,0.42)';
+    g.fillRect(0, 0, W, H);
+  }
+  g.restore();
+}
+
+/* 画背景: 默认程序化星空圆月; BG.sky=false 时走贴图(cover 铺满 + 可上下提拉对位) */
 function drawBg(g, key) {
+  if (BG.sky !== false) {
+    drawNightSky(g, key === 'bg_closed');
+    return;
+  }
   const i = img(key);
   if (i) {
     /* 平移后底部可能露边, 先铺底色, 免得露出透明画布 */
