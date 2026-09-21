@@ -80,79 +80,6 @@ const COLORS = {
   counterOutline: 'rgba(96,60,31,0.5)',
 };
 
-/* ---- 双主题: 日(营业/开灯) / 夜(闭店/关灯) ----
- * setTheme 会把对应色值整体覆写进 COLORS, 所以所有绘制处都自动跟着变 */
-const COLORS_DAY = Object.assign({}, COLORS);
-const COLORS_NIGHT = Object.assign({}, COLORS, {
-  bg: '#141220',
-  bgWarm: '#242135',
-  bgWarmDeep: '#100e1a',
-
-  panel: '#3a322c',
-  panelLight: '#4a3f37',
-  panelDark: '#2c2621',
-  panelInner: '#332c27',
-  panelBorder: '#7c6444',
-  panelInk: '#f2e6d0',
-  panelInkDim: '#b8a78c',
-  panelTitle: '#dcb277',
-
-  gold: '#c2a04f',
-  goldLight: '#e6cf95',
-  cream: '#f4e8d2',
-  creamDim: '#d5c2a0',
-  text: '#f2e6d0',
-  textDim: '#b8a78c',
-  ok: '#6f9655',
-  warn: '#c09453',
-  fail: '#b06a5c',
-
-  gloss: 'rgba(255,255,255,0.10)',
-  btnTop: '#64513c',
-  btnMid: '#4c3c2c',
-  btnBot: '#382c20',
-  btnTopOn: '#77614a',
-  btnMidOn: '#5a4835',
-  btnBotOn: '#423426',
-  borderTop: '#8f7048',
-  borderMid: '#6b5230',
-  borderBot: '#443119',
-  btnInk: '#1c150e',
-  shadow: 'rgba(0,0,0,0.35)',
-  headerTop: '#3a3040',
-  headerBot: '#241d29',
-
-  counterFloor1: '#4a3a2c',
-  counterFloor2: '#3c2e23',
-  counterFloor3: '#241b14',
-  counterTop1: '#6b5a48',
-  counterTop2: '#574839',
-  counterTop3: '#42362b',
-  counterTopHi: 'rgba(255,240,210,0.16)',
-  counterEdge1: '#8a6f4a',
-  counterEdge3: '#4a3720',
-  counterEdgeHi: 'rgba(255,236,196,0.22)',
-  counterFace1: '#3f3226',
-  counterFace2: '#33281e',
-  counterFace3: '#1f1811',
-  counterSeam: '#161009',
-  counterSeamHi: '#5c4830',
-  counterWood: '#2a2016',
-  counterOutline: 'rgba(12,8,4,0.55)',
-});
-
-let themeName = 'day';
-function currentTheme() {
-  return themeName;
-}
-/* 切换主题: 'day' | 'night'; 同主题重复调用直接返回 */
-function setTheme(name) {
-  const next = name === 'night' ? 'night' : 'day';
-  if (next === themeName) return;
-  const src = next === 'night' ? COLORS_NIGHT : COLORS_DAY;
-  for (const k in src) COLORS[k] = src[k];
-  themeName = next;
-}
 
 /* ---- 操作台尺寸(逻辑坐标) ---- */
 const LAYOUT = {
@@ -259,6 +186,13 @@ const DAY = {
   /* 耐心耗尽离开的惩罚 */
   leaveCoinPenalty: 15,
   leaveRepPenalty: 2,
+
+  specialChance: 0.12, // 特殊客人出现概率(在有资格的特殊客人里随机抽)
+  /* 五金月饼砸人 */
+  smashRepPenalty: 5, // 砸普通客人掉的口碑(砸找茬的不掉)
+  smashShake: 12,
+  /* 立绘占位: 用竖排「顾客」二字代替客人贴图(贴图齐了 -> false) */
+  customerTextPlaceholder: false,
 };
 
 /* ---- 撒钱(客人结算的金币拆成分币撒出, 点击收集才入账) ----
@@ -327,6 +261,13 @@ const COUNTER = {
 /* ---- 工厂 ---- */
 const FACTORY_TICK = 0.5; // 产线结算步长(秒)
 const STOCK_START_RATIO = 0.5; // 开局库存占容量比例
+
+/* ---- 品质(全厂平均品质的作用) ----
+ * 品质只升不降: 1 是基准; 每高 1 点 -> 出餐金币 +pricePerLevel, 口碑 +repPerLevel */
+const QUALITY = {
+  pricePerLevel: 0.3, // 每 1 点品质 -> 售价 +30%
+  repPerLevel: 1, // 每 1 点品质 -> 口碑 +1(向下取整)
+};
 const START_MATERIAL_EACH = 5; // 开局赠送的启动材料: 初始饼皮 + 初始馅料, 每种各 5 个
 /* 取货: 从工厂面板把原料搬到原料架, 每次可连续取 */
 const FETCH = {
@@ -373,7 +314,8 @@ const ASSET_LIST = [
   { key: 'filling_a', src: 'assets/sprite/filling_a.png' }, // 五仁/莲蓉/豆沙/蛋黄
   { key: 'filling_b', src: 'assets/sprite/filling_b.png' }, // 西瓜/螺丝/砖头/腐肉
   /* 客人 2×2 四宫格立绘 */
-  { key: 'npc', src: 'assets/贴图/顾客.png' },
+  { key: 'npc_normal', src: 'assets/贴图/普通npc.png' }, // 普通顾客立绘(3×3, 中间格空)
+  { key: 'npc_special', src: 'assets/贴图/特殊npc.png' }, // 特殊客人立绘(3×3, 中间格空)
 
   /* 图集/包(自动识别连通块切格, 不要求严格网格; 顺序见 core/assets.js 的 SHEET_SLICES)
    * 之后美术交付的贴图统一放 assets/贴图/ 下 */
@@ -383,6 +325,7 @@ const ASSET_LIST = [
   { key: 'fx_sheet', src: 'assets/贴图/特效.png' },
   { key: 'mold_stamp_sheet', src: 'assets/贴图/道具.png' },
   { key: 'counter_sheet', src: 'assets/贴图/柜台.png' },
+  { key: 'hardware_sheet', src: 'assets/贴图/五金.png' }, // 五金月饼(裁留白后存成 hardware_moon)
 
   /* 道具图标 */
   { key: 'mold_stamp', src: 'assets/mask/mold_stamp.png' },
@@ -396,15 +339,8 @@ const ASSET_LIST = [
   { key: 'bg_menu', src: 'assets/bg/bg_menu.png' },
 
   /* UI */
-  { key: 'ui_panel', src: 'assets/ui/ui_panel.png' },
-  { key: 'ui_card', src: 'assets/ui/ui_card.png' },
-  { key: 'ui_button', src: 'assets/ui/ui_button.png' },
-  { key: 'ui_button_active', src: 'assets/ui/ui_button_active.png' },
-  { key: 'ui_coin', src: 'assets/ui/ui_coin.png' },
-  { key: 'ui_star', src: 'assets/ui/ui_star.png' },
-  { key: 'ui_plate', src: 'assets/ui/ui_plate.png' },
-  { key: 'ui_box', src: 'assets/ui/ui_box.png' },
-  { key: 'ui_lock', src: 'assets/ui/ui_lock.png' },
+  /* 注: ui_panel/ui_button 等已改为程序化绘制; 只剩金币/托盘/锁三件用图集,
+   * 由 assets/贴图/ui新.png 切出(见 assets.js 的 UI_SHEET_LITE), 不再单列 PNG */
 
   /* 工厂 */
   { key: 'factory_crust', src: 'assets/factory/factory_crust.png' },

@@ -50,9 +50,9 @@ function undoFilling(slot) {
   return slot.fillings.pop();
 }
 
-/* 托盘是否可送烤 */
+/* 托盘是否可送烤: 只有一张饼皮(没馅)也可以 -> 单饼皮月饼 */
 function slotReady(slot) {
-  return !!slot.crustId && slot.fillings.length > 0;
+  return !!slot.crustId;
 }
 
 /* ---- 烤位 ---- */
@@ -122,6 +122,9 @@ function scoreServe(customer, moon) {
     /* 多余层数扣分 */
     const extra = Math.max(0, got.length - want.length);
     fillingScore = clamp(hit / want.length - extra * 0.2, 0, 1);
+  } else {
+    /* 订单没要馅料(单饼皮): 没多放就是对的 */
+    fillingScore = got.length === 0 ? 1 : 0;
   }
 
   /* 火候 */

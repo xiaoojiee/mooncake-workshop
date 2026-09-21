@@ -5,7 +5,7 @@
 /* global scenes, clock, input, updateFactories, updateFloaters, drawFloaters, saveGameThrottled,
    screenMsg, floaters, shake, ctx, W, H, COLORS, setFont, drawText, initInput, VW, VH,
    drawBackpackButton, drawBackpackWindow, backpackUI, drawBenchUpgradeWindow, benchUpgradeUI,
-   drawStockingWindow, stockingUI, drawDebugButton, setTheme, run */
+   drawStockingWindow, stockingUI, drawDebugButton, drawClosedOverlay, hudChromeVisible */
 
 let lastTime = 0;
 let rafId = 0;
@@ -49,17 +49,20 @@ function step(now) {
   }
   ctx.setTransform(dpr, 0, 0, dpr, ox * dpr, oy * dpr);
 
-  /* 主题: 营业中 = 开灯(日); 开始界面/工厂/排行榜 = 闭店关灯(夜) */
-  setTheme(run.scene === 'shop' ? 'day' : 'night');
-
   scenes.draw();
 
-  /* 全局背包(任何界面都可用) */
-  drawBackpackButton(ctx);
-  drawDebugButton(ctx);
-  if (backpackUI.open) drawBackpackWindow(ctx);
-  if (stockingUI.open) drawStockingWindow(ctx);
-  if (benchUpgradeUI.open) drawBenchUpgradeWindow(ctx);
+  /* 闭店: 先给场景蒙黑(内部自带场景判断, 加载页/营业不蒙)
+   * 必须画在浮窗之前, 否则「今日菜单」「背包」等弹窗会被一起蒙掉 */
+  drawClosedOverlay(ctx);
+
+  /* 全局背包(进入游戏后可用; 启动/加载页不显示) —— 画在蒙板之上, 保持明亮可读 */
+  if (hudChromeVisible()) {
+    drawBackpackButton(ctx);
+    drawDebugButton(ctx);
+    if (backpackUI.open) drawBackpackWindow(ctx);
+    if (stockingUI.open) drawStockingWindow(ctx);
+    if (benchUpgradeUI.open) drawBenchUpgradeWindow(ctx);
+  }
 
   drawFloaters(ctx);
   drawScreenMsg();

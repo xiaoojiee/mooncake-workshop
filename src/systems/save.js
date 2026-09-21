@@ -46,6 +46,7 @@ function buildSaveParts() {
   const backpack = {
     crust: shop.backpack ? shop.backpack.crust : {},
     filling: shop.backpack ? shop.backpack.filling : {},
+    hardware: shop.backpack ? shop.backpack.hardware : {},
   };
   /* 组件仓库 */
   const components = shop.components || {};
@@ -185,6 +186,7 @@ function resetGame() {
   run.oven = [];
   run.customers = [];
   run.money = [];
+  run.plates = [];
   run.spawnQueue = [];
   run.spawnTimer = 0;
   run.combo = 0;

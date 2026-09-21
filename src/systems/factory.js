@@ -23,7 +23,7 @@
    OVEN, ASSEMBLY, COUNTER, COUNTER_LABEL, CORE, PRODUCE, createOvenSlot, createSlot,
    addFloater, SFX, saveGame, findComponentDef, findFactoryDef, isComponentAllowed,
    componentRestrictLabel, computeFactoryStats, slotCost, componentUpgradeCost, MAX_SLOTS,
-   CRUSTS, FILLINGS, START_MATERIAL_EACH */
+   CRUSTS, FILLINGS, START_MATERIAL_EACH, QUALITY */
 
 /* ---- 5×5 网格 ---- */
 const GRID = { size: 5, core: 12 };
@@ -89,7 +89,7 @@ function initFactories(saved) {
   shop.nextUnitId = 1;
   shop.components = shop.components || {};
   shop.coreLevel = shop.coreLevel || 1;
-  shop.backpack = { crust: {}, filling: {} };
+  shop.backpack = { crust: {}, filling: {}, hardware: {} };
 
   for (const s of STARTER_UNITS) addUnit(s.factoryId, s.cell);
   for (const fid in STARTER_CARDS) shop.factoryBag[fid] = STARTER_CARDS[fid];
@@ -142,9 +142,48 @@ function applyFactorySave(saved) {
   if (saved.components) shop.components = saved.components;
   if (saved.coreLevel) shop.coreLevel = saved.coreLevel;
   if (saved.backpack) {
-    shop.backpack.crust = saved.backpack.crust || {};
-    shop.backpack.filling = saved.backpack.filling || {};
+  shop.backpack.crust = saved.backpack.crust || {};
+  shop.backpack.filling = saved.backpack.filling || {};
+  shop.backpack.hardware = saved.backpack.hardware || {};
   }
+}
+
+/* 某条产线(工厂)的当前品质: 同一种工厂上场多座就取平均; 没上场算 1 */
+function factoryQualityOf(factoryId) {
+  if (!factoryId) return 1;
+  let sum = 0;
+  let n = 0;
+  for (const uid in shop.units) {
+    const u = shop.units[uid];
+    if (u.factoryId !== factoryId) continue;
+    sum += u.quality || 1;
+    n += 1;
+  }
+  return n ? sum / n : 1;
+}
+
+/* 这块月饼的「馅料品质」: 只按每种馅料「产出它的那家工厂」的品质加权
+ * (饼皮不算; 订单没要馅料 -> 品质 1, 无加成)
+ * 返回 { effQuality, price, rep } */
+function moonQuality(moon) {
+  const fillings = (moon && moon.fillings) || [];
+  let wsum = 0;
+  let w = 0;
+  for (const f of fillings) {
+    const fd = findFillingDef(f);
+    if (!fd) continue;
+    const q = factoryQualityOf(fd.factory);
+    const weight = fd.value || 5;
+    wsum += q * weight;
+    w += weight;
+  }
+  const effQuality = w ? wsum / w : 1;
+  const extra = Math.max(0, effQuality - 1);
+  return {
+    effQuality: effQuality,
+    price: 1 + extra * (QUALITY.pricePerLevel || 0),
+    rep: Math.floor(extra * (QUALITY.repPerLevel || 0)),
+  };
 }
 
 function getUnit(uid) {
@@ -532,16 +571,21 @@ function neighborUnitWithDrop(cell) {
 }
 
 /* ---- 背包存取(产物) ---- */
+/* 背包按类别分桶: crust / filling / hardware; 缺桶自动建 */
+function backpackBucket(kind) {
+  if (!shop.backpack) shop.backpack = { crust: {}, filling: {}, hardware: {} };
+  if (!shop.backpack[kind]) shop.backpack[kind] = {};
+  return shop.backpack[kind];
+}
 function backpackCount(kind, productId) {
-  const bucket = kind === 'crust' ? shop.backpack.crust : shop.backpack.filling;
-  return bucket[productId] || 0;
+  return backpackBucket(kind)[productId] || 0;
 }
 function backpackAdd(kind, productId, n) {
-  const bucket = kind === 'crust' ? shop.backpack.crust : shop.backpack.filling;
+  const bucket = backpackBucket(kind);
   bucket[productId] = (bucket[productId] || 0) + n;
 }
 function backpackTake(kind, productId, n) {
-  const bucket = kind === 'crust' ? shop.backpack.crust : shop.backpack.filling;
+  const bucket = backpackBucket(kind);
   if ((bucket[productId] || 0) < n) return false;
   bucket[productId] -= n;
   return true;

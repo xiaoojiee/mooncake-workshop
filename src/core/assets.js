@@ -32,7 +32,8 @@ function hasAsset(key) {
 /* ---- UI 图集切格 ----
  * assets/贴图/ui.png 是 3×3: 每格一个 UI 件; 加载后裁掉透明留白, 填回对应的 IMG[key]
  * 这样老的 drawSprite(g,'ui_coin',...) / uiPanel / uiButton 都能直接用上真贴图 */
-const UI_SHEET_MAP = [
+/* UI 图集里「按行顺序」对应的 key(可多套候选, 按图集实际切出几个来选) */
+const UI_SHEET_FULL = [
   { key: 'ui_panel', col: 0, row: 0 },
   { key: 'ui_card', col: 1, row: 0 },
   { key: 'ui_button', col: 2, row: 0 },
@@ -42,6 +43,12 @@ const UI_SHEET_MAP = [
   { key: 'ui_plate', col: 0, row: 2 },
   { key: 'ui_box', col: 1, row: 2 },
   { key: 'ui_lock', col: 2, row: 2 },
+];
+/* 精简版: 实际会被绘制的只有这 3 件(面板/按钮已改成程序化绘制) */
+const UI_SHEET_LITE = [
+  { key: 'ui_coin', col: 0, row: 0 },
+  { key: 'ui_plate', col: 1, row: 0 },
+  { key: 'ui_lock', col: 2, row: 0 },
 ];
 
 /* 裁掉四周透明留白(取不透明像素的包围盒) */
@@ -82,7 +89,15 @@ function cropToOpaque(canvas) {
 /* 要切的图集: key = 图集, keys = 按「行->列」顺序对应的目标 key */
 const SHEET_SLICES = [
   /* 默认可不指定: 用连通块自动识别(适合元素分离的图集) */
-  { key: 'ui_sheet', keys: UI_SHEET_MAP.map((m) => m.key) },
+  /* ui 图集: 9 格(完整) 或 3 格(精简: 金币/托盘/锁) 都支持, 按切出来的数量自动选 */
+  {
+    key: 'ui_sheet',
+    keys: UI_SHEET_FULL.map((m) => m.key),
+    variants: [
+      { keys: UI_SHEET_FULL.map((m) => m.key) },
+      { keys: UI_SHEET_LITE.map((m) => m.key) },
+    ],
+  },
   { key: 'components_sheet', keys: ['comp_motor', 'comp_gear', 'comp_cooler', 'comp_mold', 'comp_mixer', 'comp_moon', 'comp_melon', 'comp_nut', 'comp_kiln', 'comp_spawner'] },
   /* 图标包: 小闪光/挂件分散 -> 按行等分 + 行内投影分列 */
   { key: 'factory_icons', keys: ['factory_crust', 'factory_filling', 'icon_speed', 'icon_capacity', 'icon_quality', 'icon_unlock'], rows: 2 },
@@ -189,13 +204,14 @@ function sliceSheetByBoxes(spec) {
 const SINGLE_CROPS = [
   { key: 'mold_stamp_sheet', dst: 'mold_stamp' },
   { key: 'counter_sheet', dst: 'counter' },
+  { key: 'hardware_sheet', dst: 'hardware_moon' }, // 五金月饼(整张一个元素)
 ];
 
 /* 通用切法: 不依赖网格 —— 扫出不透明「连通块」, 按 行->列 顺序对应 keys */
 function sliceSheet(spec) {
   const sheet = img(spec.key);
-  const keys = spec.keys;
   if (!sheet) return;
+  let keys = spec.keys || null;
   const sw = sheet.naturalWidth || sheet.width;
   const sh = sheet.naturalHeight || sheet.height;
 
@@ -249,9 +265,20 @@ function sliceSheet(spec) {
     if (area > 400) comps.push({ minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 });
   }
 
-  if (comps.length !== keys.length) {
+  /* 数量对不上时的处理:
+   *   variants -> 在候选清单里挑一个「数量正好对上」的(例如 UI 图集 9 格/3 格都支持)
+   *   有 rows -> 退回按行等分
+   *   否则不切 */
+  if (spec.variants) {
+    const v = spec.variants.find((x) => x.keys.length === comps.length);
+    if (!v) {
+      if (spec.rows) sliceSheetByRows(spec);
+      return;
+    }
+    keys = v.keys;
+  } else if (comps.length !== keys.length) {
     if (spec.rows) sliceSheetByRows(spec);
-    return; // 数量对不上: 有指定行数就用行切, 否则不切
+    return;
   }
 
   /* 按行分组(中心 y 接近的算同一行), 行内按 x 排序 */

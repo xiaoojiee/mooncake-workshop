@@ -26,16 +26,17 @@
    uiBar, drawText, wrapText, hitButton, pointInRect, dist, SFX, drawBg, drawFallbackBg, addShake, BG,
    showScreenText, formatNum, formatTime, saveGame, backpackCount, backpackTake, backpackAdd,
    applyOvenUpgrade, upgradesFor, interact,
-   findComponentDef, COMPONENT_TYPES, buySlot, installComponent, removeComponent,
+   findComponentDef, hasComponentInstalled, COMPONENT_TYPES, buySlot, installComponent, removeComponent,
    upgradeComponent, buyComponent, slotCost, MAX_SLOTS, unlockLabel,
-   MONEY, COUNTER, COUNTER_LABEL, DAY, touching, rand, randInt, clamp, img, addFloater,
+   MONEY, COUNTER, COUNTER_LABEL, DAY, touching, rand, randInt, clamp, lerp, img, addFloater,
    benchSlotCount, moveComponent, ovenBakeTime, ovenBurnTime, counterLevel,
    slotAutoLevel,
    applyCounterUpgrade, counterUpgradeCost, isComponentAllowed, componentRestrictLabel,
    poweredUnitIds, isUnitPowered,
    factoryBoard, factoryBoardReset, factoryBoardDraw, factoryBoardDown, factoryBoardMove,
    factoryBoardUp, factoryBoardWheel, factoryBoardUpdate, factoryBoardSweep, input,
-   benchUpgradeToggle, benchUpgradeUI */
+   benchUpgradeToggle, benchUpgradeUI, HARDWARE, findProductDef,
+drawSprite, strokeRoundRect */
 
 const game = {
   buttons: [],
@@ -43,6 +44,10 @@ const game = {
   active: null,
   drag: null, // { kind:'crust'|'filling'|'slot'|'oven', ... , x, y }
   toast: null, // { text, color, life }
+  impact: null, // 击飞冲击特效 { x, y, t }
+  smashItem: null, // 已选中的五金月饼 id(点客人砸飞)
+  smashFrom: null, // 拿起五金月饼的位置(投掷起点)
+  throws: [], // 飞行中的五金月饼 [{ t, dur, x0, y0, x1, y1, spin, target }]
   dayEnd: false,
   dayEndT: 0,
   result: null, // 最近一次出餐结果
@@ -84,7 +89,22 @@ function compName(compId) {
 }
 
 /* 拖拽来源类型 */
-const DRAG = { CRUST: 'crust', FILLING: 'filling', SLOT: 'slot', OVEN: 'oven', COMPONENT: 'component' };
+const DRAG = {
+  CRUST: 'crust', FILLING: 'filling', SLOT: 'slot', OVEN: 'oven',
+  PLATE: 'plate', // 柜台上已摆好的月饼
+  COMPONENT: 'component',
+};
+
+/* 柜台上可以摆月饼的那条台面(送烤/摆盘/砸钱都在这一带) */
+const PLATE_R = 26; // 摆盘月饼的半径
+const MAX_PLATES = 8; // 台面上最多摆几块
+function counterDropArea() {
+  const top = counterTopY();
+  return { x: 0, y: top, w: W, h: LAYOUT.counterY + 26 - top };
+}
+function plateCenterY() {
+  return counterTopY() + 26;
+}
 
 scenes.register(
   'shop',
@@ -170,6 +190,12 @@ scenes.register(
         if (game.toast.life <= 0) game.toast = null;
       }
       if (game.resultT > 0) game.resultT -= dt;
+      if (game.impact) {
+        game.impact.t += dt;
+        if (game.impact.t > 0.6) game.impact = null;
+      }
+      updateThrows(dt);
+      updateFlyingItems(dt);
 
       /* 收尾判定: 没客人了、都离场了、台面上也没待捡的金币 */
       if (!hasMoreCustomers() && !run.customers.length && !run.money.length && !game.dayEnd) {
@@ -248,6 +274,17 @@ scenes.register(
         return;
       }
 
+      /* 五金月饼已选中: 点客人 = 投出去砸飞(命中才结算) */
+      if (game.smashItem) {
+        const victim = pickCustomerAt(x, y);
+        if (victim) {
+          const from = game.smashFrom || { x: LAYOUT.backpack.x + 40, y: LAYOUT.backpack.y + 60 };
+          throwHardware(victim, from.x, from.y, x, y);
+          return;
+        }
+        if (!pointInRect(x, y, hotbarPanelArea())) game.smashItem = null;
+      }
+
       /* 先判断是否点在可拖拽对象上 */
       const src = pickDraggable(x, y);
       if (src) {
@@ -293,6 +330,7 @@ scenes.register(
           return;
         }
         if (Math.hypot(dx, dy) > 10) {
+          if (p.kind === 'hardware') return; // 道具只能点击选中, 不能拖
           game.drag = { kind: p.kind === 'crust' ? DRAG.CRUST : DRAG.FILLING, productId: p.id, x, y };
           game.hotbarPress = null;
           return;
@@ -327,8 +365,14 @@ scenes.register(
       }
       for (const btn of game.buttons) btn.pressed = false;
       game.holdFetch = null;
+      const hbPress = game.hotbarPress; // 没拖走 -> 算点击
       game.hotbarPress = null;
       game.hotbarDrag = null;
+      if (hbPress && hbPress.kind === 'hardware') {
+        toggleSmashItem(hbPress.id, hbPress.x, hbPress.y);
+        game.active = null;
+        return;
+      }
 
       /* 没拖动过的按下: 视为点击(升级/卸下) */
       if (game.pendingCompDrag) {
@@ -363,9 +407,11 @@ scenes.register(
       if (typeof drawBg === 'function') drawBg(ctx, img('bg_open') ? 'bg_open' : 'bg_counter');
       else drawFallbackBg(ctx);
 
-      drawCustomers(ctx);
-      drawCounter(ctx);
-      drawMoney(ctx);
+  drawCustomers(ctx);
+  drawCounter(ctx);
+  drawPlates(ctx);
+  drawImpact(ctx);
+  drawMoney(ctx);
       drawCart(ctx);
       drawHotbar(ctx);
       drawBench(ctx);
@@ -409,8 +455,13 @@ scenes.register(
       /* 工厂面板(共享网格 UI, 半透明, 不暂停) */
       if (run.factoryOpen) factoryBoardDraw(ctx, { dim: true, showClose: true });
 
+      /* 投出的五金月饼 + 自动装配飞行的食材: 画在所有面板之上, 否则会被快捷栏/制作台挡住 */
+      drawThrows(ctx);
+      drawFlyingItems(ctx);
+
       /* 拖拽物跟随 */
       if (game.drag) drawDragGhost(ctx, game.drag);
+
 
       /* 出餐结果飘出 */
       if (game.resultT > 0 && game.result) drawServeResult(ctx, game.result);
@@ -446,8 +497,13 @@ function startDay() {
   run.combo = 0;
   run.factoryOpen = false;
   run.money = [];
+  run.plates = []; // 柜台上摆的月饼(每天清空)
   run.cart = { x: W / 2, dir: 1 };
   game.dayEnd = false;
+  game.smashItem = null;
+  game.smashFrom = null;
+  game.throws = [];
+  game.flyingItems = [];
 
   /* 制作台托盘 */
   run.slots = [];
@@ -470,53 +526,264 @@ function finishDay() {
   saveGame();
 }
 
-/* 制作台自动化: 每个间隔只走一步 —— 先放饼皮, 之后每隔一段时间叠一层馅
- * 例: 3 秒发一张皮, 再 3 秒放一个馅, 如此类推(送烤/出餐仍手动) */
-function updateAutoBench(dt) {
-  const autoSlots = run.slots ? run.slots.filter((s) => s.auto) : [];
+/* 清空自动槽位的「记账」(不动托盘里的料) */
+function resetAutoSlot(slot) {
+  slot.autoCust = null;
+  slot.autoOrder = null;
+  slot.autoDone = 0;
+  slot.autoT = 0;
+  slot.autoPending = false;
+}
 
-  if (autoSlots.length) {
-    /* 已被其它自动制作台盯上的客人 */
-    const taken = [];
-    for (const s of autoSlots) if (s.autoCust) taken.push(s.autoCust);
+/* ---- 自动装配特效: 食材从快捷栏飞进托盘 ---- */
 
-    for (const slot of autoSlots) {
-      const lv = slot.autoLevel || 1;
-      const interval = (COUNTER.auto.interval[Math.min(lv, COUNTER.auto.interval.length) - 1]) || 3.0;
-      slot.autoT = (slot.autoT || 0) + dt;
-      if (slot.autoT < interval) continue;
-      slot.autoT = 0;
+/* 该食材在快捷栏里的位置(找不到就退回快捷栏左下角) */
+function autoFlightFrom(kind, id) {
+  for (const it of hotbarItems()) {
+    if (it.kind === kind && it.id === id) {
+      return { x: it.rect.x + 30, y: it.rect.y + it.rect.h / 2 };
+    }
+  }
+  return { x: LAYOUT.backpack.x + 40, y: LAYOUT.backpack.y + 60 };
+}
 
-      /* 空托盘: 挑一个没人做、等最久的客人, 放一张皮 */
-      if (!slot.crustId) {
-        let cust = null;
-        for (const c of run.customers) {
-          if (c.state !== 'waiting') continue;
-          if (taken.indexOf(c) >= 0) continue;
-          if (!cust || c.patienceLeft < cust.patienceLeft) cust = c;
-        }
-        if (!cust) continue;
-        if (backpackCount('crust', cust.order.crustId) < 1) continue;
-        backpackTake('crust', cust.order.crustId, 1);
-        placeCrust(slot, cust.order.crustId);
-        slot.autoCust = cust;
-        taken.push(cust);
-        slot.autoOrder = cust.order.fillings.slice();
-        slot.autoDone = 0;
-        SFX.stamp();
-        continue;
+/* 起飞: 记一枚飞行中的食材(材料此刻已扣, 落地才真正放进托盘) */
+function spawnAutoFlight(slot, index, kind, id) {
+  const from = autoFlightFrom(kind, id);
+  const to = slotCenter(index);
+  game.flyingItems = game.flyingItems || [];
+  game.flyingItems.push({
+    t: 0,
+    delay: 0,
+    dur: 0.32,
+    x0: from.x,
+    y0: from.y,
+    x1: to.x,
+    y1: to.y,
+    spin: 9,
+    kind: kind,
+    id: id,
+    mode: 'in', // 落地才真正放进托盘
+    slot: slot,
+  });
+  slot.autoPending = true;
+}
+
+/* 落地: 放进托盘(期间托盘被占了就把材料退回背包) */
+function updateFlyingItems(dt) {
+  if (!game.flyingItems || !game.flyingItems.length) return;
+  for (let i = game.flyingItems.length - 1; i >= 0; i--) {
+    const f = game.flyingItems[i];
+    f.t += dt;
+    if (f.t < (f.delay || 0) + f.dur) continue;
+    game.flyingItems.splice(i, 1);
+    if (f.mode === 'out') continue; // 飞出只是特效: 材料在起飞时已经退回背包
+    const slot = f.slot;
+    let landed = false;
+    if (f.kind === 'crust') {
+      landed = !slot.crustId && placeCrust(slot, f.id).ok;
+    } else {
+      landed = !!slot.crustId && placeFilling(slot, f.id, ASSEMBLY.maxFillings).ok;
+    }
+    if (landed) SFX.stamp();
+    else backpackAdd(f.kind, f.id, 1); // 没放进去就退料
+    slot.autoPending = false;
+  }
+}
+
+/* 画飞行中的食材(边飞边转) */
+function drawFlyingItems(g) {
+  if (!game.flyingItems || !game.flyingItems.length) return;
+  for (const f of game.flyingItems) {
+    const p = clamp((f.t - (f.delay || 0)) / f.dur, 0, 1);
+    if (p <= 0) continue; // 还没到起飞时间(错开出场)
+    const pos = throwPos(f, p); // 和投掷共用同一条抛物线
+    g.save();
+    g.translate(pos.x, pos.y);
+    g.rotate(p * f.spin);
+    if (f.kind === 'crust') {
+      const cd = findCrustDef(f.id);
+      if (!drawCrustPart(g, cd ? cd.col : 0, 'raw', -24, -24, 48, 48)) {
+        g.fillStyle = cd ? cd.color : COLORS.crust;
+        g.beginPath();
+        g.arc(0, 0, 20, 0, Math.PI * 2);
+        g.fill();
       }
-
-      /* 有皮了: 每次叠一层馅 */
-      if (slot.autoOrder && slot.autoDone < slot.autoOrder.length) {
-        const f = slot.autoOrder[slot.autoDone];
-        if (backpackCount('filling', f) < 1) continue; // 没货, 等下一间隔
-        backpackTake('filling', f, 1);
-        placeFilling(slot, f, ASSEMBLY.maxFillings);
-        slot.autoDone += 1;
-        SFX.stamp();
+    } else {
+      const fd = findFillingDef(f.id);
+      if (!drawFillingIcon(g, fd ? fd.index : 0, 0, 0, 48)) {
+        g.fillStyle = fd ? fd.color : COLORS.panelInk;
+        g.beginPath();
+        g.arc(0, 0, 20, 0, Math.PI * 2);
+        g.fill();
       }
     }
+    g.restore();
+  }
+}
+
+/* 托盘中心(飞行起点/终点) */
+function slotCenter(index) {
+  const r = slotRect(index);
+  return { x: r.x + r.w / 2, y: r.y + r.h / 2 + 10 };
+}
+
+/* 把托盘里的半成品退回背包(自动台清料时用, 免得白瞎材料)
+ * 材料立刻退回, 同时放一串「飞出」特效(食材从托盘飞回快捷栏) */
+function refundSlot(slot) {
+  if (!slot.crustId) return;
+  const from = slotCenter(run.slots.indexOf(slot));
+  const out = [{ kind: 'crust', id: slot.crustId }];
+  for (const f of slot.fillings) out.push({ kind: 'filling', id: f });
+  for (const o of out) backpackAdd(o.kind, o.id, 1);
+  clearSlot(slot);
+  /* 特效: 一件件错开飞回快捷栏(材料已退, 这里只画) */
+  out.forEach((o, i) => spawnFlyOut(o.kind, o.id, from.x, from.y, i * 0.05));
+}
+
+/* 飞出特效: 从(fromX,fromY)飞回快捷栏里该食材那一行 */
+function spawnFlyOut(kind, id, fromX, fromY, delay) {
+  const to = autoFlightFrom(kind, id);
+  game.flyingItems = game.flyingItems || [];
+  game.flyingItems.push({
+    t: 0,
+    delay: delay || 0,
+    dur: 0.3,
+    x0: fromX,
+    y0: fromY,
+    x1: to.x,
+    y1: to.y,
+    spin: -8,
+    kind: kind,
+    id: id,
+    mode: 'out', // 只画, 落地不改状态(材料已退)
+    slot: null,
+  });
+}
+
+/* 这张订单的馅料背包里齐不齐 */
+function autoOrderReady(order) {
+  const need = {};
+  for (const f of order.fillings) need[f] = (need[f] || 0) + 1;
+  for (const k in need) {
+    if (backpackCount('filling', k) < need[k]) return false;
+  }
+  return true;
+}
+
+/* 找一个「订单和当前托盘内容完全对得上」的等待客人(目标走了时转给他, 不浪费) */
+function findMatchingCustomer(slot, autoSlots) {
+  const taken = [];
+  for (const s of autoSlots) {
+    if (s !== slot && s.autoCust) taken.push(s.autoCust);
+  }
+  for (const c of run.customers) {
+    if (c.state !== 'waiting') continue;
+    if (taken.indexOf(c) >= 0) continue;
+    if (c.order.crustId !== slot.crustId) continue;
+    const want = c.order.fillings;
+    if (want.length !== slot.fillings.length) continue;
+    let same = true;
+    for (let i = 0; i < want.length; i++) {
+      if (want[i] !== slot.fillings[i]) { same = false; break; }
+    }
+    if (same) return c;
+  }
+  return null;
+}
+
+/* 给某个自动槽位挑目标客人:
+ *   1. 皮都没有的订单直接跳过(开不了工)
+ *   2. 优先「馅料齐全」的(能一口气做完), 其次等得最急的
+ *   3. 已被其它自动台盯上的客人跳过, 避免抢单 */
+function pickAutoTarget(autoSlots, slot) {
+  const taken = [];
+  for (const s of autoSlots) {
+    if (s !== slot && s.autoCust) taken.push(s.autoCust);
+  }
+  let best = null;
+  let bestScore = -Infinity;
+  for (const c of run.customers) {
+    if (c.state !== 'waiting') continue;
+    if (taken.indexOf(c) >= 0) continue;
+    if (backpackCount('crust', c.order.crustId) < 1) continue;
+    const ready = autoOrderReady(c.order);
+    const urgency = 1 - clamp(c.patienceLeft / c.patienceMax, 0, 1);
+    const score = (ready ? 10 : 0) + urgency * 5;
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
+}
+
+/* 制作台自动化: 每个间隔走一步 —— 先放饼皮, 之后每次叠一层馅
+ * 等级越高间隔越短(见 COUNTER.auto.interval); 送烤/出餐仍手动(可选自动烤制)
+ *
+ * 相比早先的实现, 这里修了几个「会卡住」的问题:
+ *   1. 目标客人中途走了 -> 半成品会一直占着托盘; 现在自动退料清空, 重新找活
+ *   2. 背包没料时白等一整个间隔; 现在只等 RETRY 秒就重试
+ *   3. 只按「等最久」选客人, 可能挑到原料不够的; 现在优先「料齐」的
+ *   4. 「只要一张饼皮」的订单(史蒂夫无腐肉)现在能正确标记为已完成 */
+function updateAutoBench(dt) {
+  const autoSlots = run.slots ? run.slots.filter((s) => s.auto) : [];
+  if (!autoSlots.length) return;
+
+  const RETRY = 0.35; // 没料可放时的重试间隔(秒)
+
+  for (const slot of autoSlots) {
+    if (slot.autoPending) continue; // 上一份食材还在飞, 等它落地
+    const index = run.slots.indexOf(slot); // 托盘下标(决定飞行终点)
+    const lv = slot.autoLevel || 1;
+    const interval = (COUNTER.auto.interval[Math.min(lv, COUNTER.auto.interval.length) - 1]) || 3.0;
+
+    /* 目标客人没了(走了/被服务/被砸): 托盘内容还能给别的客人就转过去, 否则退料清空 */
+    if (slot.autoCust && slot.autoCust.state !== 'waiting') {
+      const same = slot.crustId ? findMatchingCustomer(slot, autoSlots) : null;
+      if (same) {
+        slot.autoCust = same;
+      } else {
+        refundSlot(slot);
+        resetAutoSlot(slot);
+      }
+    }
+
+    /* 已经做完: 只等自动烤制/玩家取走, 不占节奏 */
+    if (slot.crustId && slot.autoOrder && slot.autoDone >= slot.autoOrder.length) {
+      slot.autoT = 0;
+      continue;
+    }
+
+    slot.autoT = (slot.autoT || 0) + dt;
+    if (slot.autoT < interval) continue;
+
+    let acted = false;
+
+    /* 空托盘: 取一张皮(飞过去, 落地才算放上) */
+    if (!slot.crustId) {
+      const cust = pickAutoTarget(autoSlots, slot);
+      if (cust && backpackCount('crust', cust.order.crustId) >= 1) {
+        backpackTake('crust', cust.order.crustId, 1);
+        slot.autoCust = cust;
+        slot.autoOrder = cust.order.fillings.slice();
+        slot.autoDone = 0;
+        spawnAutoFlight(slot, index, 'crust', cust.order.crustId);
+        acted = true;
+      }
+    } else if (slot.autoOrder && slot.autoDone < slot.autoOrder.length) {
+      /* 有皮了: 叠下一层馅(同样飞过去) */
+      const f = slot.autoOrder[slot.autoDone];
+      if (backpackCount('filling', f) >= 1) {
+        backpackTake('filling', f, 1);
+        slot.autoDone += 1;
+        spawnAutoFlight(slot, index, 'filling', f);
+        acted = true;
+      }
+    }
+
+    /* 取料成功就重置节奏; 落地音效在 updateFlyingItems 里放 */
+    slot.autoT = acted ? 0 : Math.max(0, interval - RETRY);
   }
 
   /* 自动烤制: 自动制作台装好的月饼自动送进空烤位 */
@@ -533,9 +800,7 @@ function updateAutoBench(dt) {
       };
       if (ovenPut(freeOven, moon).ok) {
         clearSlot(slot);
-        slot.autoOrder = null;
-        slot.autoCust = null;
-        slot.autoDone = 0;
+        resetAutoSlot(slot);
         SFX.click();
       }
     }
@@ -573,7 +838,41 @@ function pickDraggable(x, y) {
     }
   }
 
+  /* 柜台上摆好的月饼 */
+  const hitPlate = plateAt(x, y);
+  if (hitPlate) return { kind: DRAG.PLATE, index: hitPlate.index, x, y };
+
   return null;
+}
+
+/* ---- 柜台摆盘 ---- */
+
+/* 台面上的某块月饼(命中判定) */
+function plateAt(x, y) {
+  for (let i = run.plates.length - 1; i >= 0; i--) {
+    const p = run.plates[i];
+    if (dist(x, y, p.x, p.y) <= PLATE_R + 8) return { plate: p, index: i };
+  }
+  return null;
+}
+
+/* 把烤好的月饼摆到台面上(满了返回 false) */
+function placeOnCounter(moon, x) {
+  if (run.plates.length >= MAX_PLATES) return false;
+  run.plates.push({
+    moon: moon,
+    x: clamp(x, 48, W - 48),
+    y: plateCenterY(),
+  });
+  return true;
+}
+
+/* 从台面拿走一块 */
+function takePlate(index) {
+  const p = run.plates[index];
+  if (!p) return null;
+  run.plates.splice(index, 1);
+  return p.moon;
 }
 
 /* 松手判定 */
@@ -648,9 +947,44 @@ function dropDragged(drag, x, y) {
       }
       return;
     }
-    /* 拖到制作台空位: 取出放凉(其实直接取出丢掉)
-     * 这里设计为「拖到客人身上」才出餐, 否则提示 */
-    fail('把烤好的月饼拖给客人');
+    /* 放到柜台上: 先把烤位腾出来, 之后可以从台面拿去出餐 */
+    if (pointInRect(x, y, counterDropArea())) {
+      const moon = ovenTake(os);
+      if (!moon) return;
+      if (!placeOnCounter(moon, x)) {
+        ovenPut(os, moon); // 台面满了, 放回烤位
+        return fail('台面摆满了(' + MAX_PLATES + ')');
+      }
+      SFX.stamp();
+      return;
+    }
+    fail('拖给客人出餐, 或放到柜台上');
+    return;
+  }
+
+  /* 从柜台拿起再放下/出餐 */
+  if (drag.kind === DRAG.PLATE) {
+    const moon = takePlate(drag.index);
+    if (!moon) return;
+    const cust = pickCustomerAt(x, y);
+    if (cust) {
+      const res = serveCustomer(cust, moon);
+      if (res) {
+        spawnMoneyForCustomer(cust, res.coins);
+        game.result = res;
+        game.resultT = 1.6;
+        SFX.success();
+      } else {
+        placeOnCounter(moon, drag.x); // 客人已经走了, 放回台面
+      }
+      return;
+    }
+    if (pointInRect(x, y, counterDropArea()) && placeOnCounter(moon, x)) {
+      SFX.click();
+      return;
+    }
+    /* 拖到别处 / 台面满了: 放回原处, 不丢 */
+    placeOnCounter(moon, drag.x);
     return;
   }
 
@@ -824,6 +1158,7 @@ function hotbarUnlockedCount() {
   let n = 0;
   for (const d of CRUSTS) if (isUnlocked(d) || backpackCount('crust', d.id) > 0) n += 1;
   for (const d of FILLINGS) if (isUnlocked(d) || backpackCount('filling', d.id) > 0) n += 1;
+  for (const d of HARDWARE) if (isUnlocked(d) || backpackCount('hardware', d.id) > 0) n += 1;
   return n;
 }
 function hotbarContentH() {
@@ -853,6 +1188,10 @@ function hotbarItems() {
   for (const def of FILLINGS) {
     if (isUnlocked(def) || backpackCount('filling', def.id) > 0) defs.push({ kind: 'filling', id: def.id });
   }
+  /* 道具(五金月饼): 有货就列出, 点一下选中 */
+  for (const def of HARDWARE) {
+    if (isUnlocked(def) || backpackCount('hardware', def.id) > 0) defs.push({ kind: 'hardware', id: def.id });
+  }
   return defs.map((d, i) => ({
     kind: d.kind,
     id: d.id,
@@ -870,6 +1209,11 @@ function hotbarItemAt(x, y) {
     if (pointInRect(x, y, it.rect) && backpackCount(it.kind, it.id) > 0) return it;
   }
   return null;
+}
+
+/* 柜台上沿(= 天空带下沿): 闭店蒙板/对齐都取这个, 别各自算 */
+function counterTopY() {
+  return LAYOUT.counterY - 34; // counterY-26(台面后沿) 再减 8(台面厚度)
 }
 
 /* ---- 绘制: 柜台(横贯中部, 挡住客人下半身) ---- */
@@ -901,93 +1245,127 @@ function drawCounter(g) {
 
   g.save();
   const OUT = COLORS.counterOutline; // 卡通描边色
+  /* 台面可见区很窄(台面被 UI 面板挡住大半), 细节都集中在这一横条上 */
+  const topY = counterTopY(); // 台面后沿(可见区上沿)
+  const lipTop = edge - 6; // 前沿亮边上沿
+  const lipBot = edge + 16; // 前沿亮边下沿
 
-  /* 1) 地板底色: 从台面往下铺满, 免得露出星空 */
-  const floor = g.createLinearGradient(0, surfaceTop - 10, 0, H);
+  /* 1) 地板底色: 从台面上沿往下铺满, 免得露出星空
+   * 注意: 不要画到 counterTopY() 以上, 否则闭店蒙板会露出一条亮缝 */
+  const floor = g.createLinearGradient(0, topY, 0, H);
   floor.addColorStop(0, COLORS.counterFloor1);
-  floor.addColorStop(0.28, COLORS.counterFloor2);
+  floor.addColorStop(0.3, COLORS.counterFloor2);
   floor.addColorStop(1, COLORS.counterFloor3);
   g.fillStyle = floor;
-  g.fillRect(0, surfaceTop - 10, W, H - (surfaceTop - 10));
+  g.fillRect(0, topY, W, H - topY);
 
-  /* 2) 柜台面上的投影(客人/物品压在台面上) */
-  const shade = g.createLinearGradient(0, surfaceTop - 10, 0, edge);
-  shade.addColorStop(0, 'rgba(60,30,10,0.34)');
-  shade.addColorStop(1, 'rgba(60,30,10,0)');
-  g.fillStyle = shade;
-  g.fillRect(0, surfaceTop - 10, W, edge - (surfaceTop - 10));
+  /* 2) 台面: 后暗前亮(视线低, 近处受光多) */
+  const topGrd = g.createLinearGradient(0, topY, 0, lipTop);
+  topGrd.addColorStop(0, COLORS.counterTop3);
+  topGrd.addColorStop(0.45, COLORS.counterTop2);
+  topGrd.addColorStop(1, COLORS.counterTop1);
+  fillRoundRect(g, -28, topY, W + 56, lipTop - topY + 2, 14, topGrd);
 
-  /* 3) 台面: 圆角长条, 木色, 顶亮底暗 + 顶面高光 */
-  const topY = surfaceTop - 8;
-  const topH = edge - topY + 16;
-  const topGrd = g.createLinearGradient(0, topY, 0, topY + topH);
-  topGrd.addColorStop(0, COLORS.counterTop1);
-  topGrd.addColorStop(0.35, COLORS.counterTop2);
-  topGrd.addColorStop(1, COLORS.counterTop3);
-  fillRoundRect(g, -28, topY, W + 56, topH, 18, topGrd);
-  g.save();
-  g.globalAlpha = 0.4; // 顶面一道高光
-  fillRoundRect(g, -20, topY + 4, W + 40, 9, 6, COLORS.counterTopHi);
-  g.restore();
-  /* 木纹竖线(稀疏, 暗示木板拼接) */
-  g.save();
-  g.globalAlpha = 0.12;
-  g.strokeStyle = COLORS.counterWood;
-  g.lineWidth = 2;
-  for (let x = 60; x < W; x += 168) {
+  /* 2a) 「映月」柔光: 台面中段一片暖光, 面不至于死板 */
+  const sheen = g.createLinearGradient(0, topY, 0, lipTop);
+  sheen.addColorStop(0, 'rgba(255,236,190,0)');
+  sheen.addColorStop(0.55, 'rgba(255,236,190,0.16)');
+  sheen.addColorStop(1, 'rgba(255,236,190,0)');
+  g.fillStyle = sheen;
+  g.fillRect(0, topY, W, lipTop - topY);
+
+  /* 2b) 木板拼缝: 暗缝 + 亮边, 薄薄一层立体感 */
+  for (let x = 96; x < W; x += 176) {
+    g.save();
+    g.globalAlpha = 0.16;
+    g.strokeStyle = COLORS.counterWood;
+    g.lineWidth = 2;
     g.beginPath();
-    g.moveTo(x, topY + 6);
-    g.lineTo(x, topY + topH - 4);
+    g.moveTo(x, topY + 5);
+    g.lineTo(x, lipTop - 2);
+    g.stroke();
+    g.globalAlpha = 0.2;
+    g.strokeStyle = COLORS.counterTopHi;
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(x + 2, topY + 5);
+    g.lineTo(x + 2, lipTop - 2);
+    g.stroke();
+    g.restore();
+  }
+  /* 2c) 横向木纹(细丝, 很淡) */
+  g.save();
+  g.globalAlpha = 0.07;
+  g.strokeStyle = COLORS.counterWood;
+  g.lineWidth = 1;
+  for (let y = topY + 11; y < lipTop - 2; y += 9) {
+    g.beginPath();
+    g.moveTo(0, y);
+    g.lineTo(W, y + 1);
     g.stroke();
   }
   g.restore();
 
-  /* 4) 前沿粗包边(琥珀金属) */
-  const edgeGrd = g.createLinearGradient(0, edge - 4, 0, edge + 16);
+  /* 3) 台面投影: 客人/物品压在台面上(上深下透) */
+  const shade = g.createLinearGradient(0, topY, 0, lipTop);
+  shade.addColorStop(0, 'rgba(60,30,10,0.3)');
+  shade.addColorStop(0.7, 'rgba(60,30,10,0.06)');
+  shade.addColorStop(1, 'rgba(60,30,10,0)');
+  g.fillStyle = shade;
+  g.fillRect(0, topY, W, lipTop - topY);
+
+  /* 4) 前沿亮边(琥珀金属): 上高光 → 下暗 */
+  const edgeGrd = g.createLinearGradient(0, lipTop, 0, lipBot);
   edgeGrd.addColorStop(0, COLORS.counterEdge1);
-  edgeGrd.addColorStop(0.35, COLORS.panelBorder);
+  edgeGrd.addColorStop(0.3, COLORS.panelBorder);
   edgeGrd.addColorStop(1, COLORS.counterEdge3);
-  fillRoundRect(g, -28, edge - 4, W + 56, 20, 10, edgeGrd);
+  fillRoundRect(g, -28, lipTop, W + 56, lipBot - lipTop, 10, edgeGrd);
   g.save();
-  g.globalAlpha = 0.45;
-  fillRoundRect(g, -22, edge - 1, W + 44, 4, 2, COLORS.counterEdgeHi);
+  g.globalAlpha = 0.55; // 亮边顶面高光
+  fillRoundRect(g, -22, lipTop + 2, W + 44, 3, 1.5, COLORS.counterEdgeHi);
+  g.globalAlpha = 0.3; // 亮边下沿暗线
+  fillRoundRect(g, -22, lipBot - 4, W + 44, 3, 1.5, COLORS.counterFace3);
   g.restore();
 
-  /* 5) 前沿立面 + 竖向木板缝 + 底部渐深 */
-  const grd2 = g.createLinearGradient(0, edge + 16, 0, slabBot + 40);
+  /* 5) 前沿立面(大部分被 UI 面板挡住): 渐变 + 竖缝 + 亮边投影 */
+  const grd2 = g.createLinearGradient(0, lipBot, 0, slabBot + 40);
   grd2.addColorStop(0, COLORS.counterFace1);
   grd2.addColorStop(0.5, COLORS.counterFace2);
   grd2.addColorStop(1, COLORS.counterFace3);
   g.fillStyle = grd2;
-  g.fillRect(0, edge + 16, W, H - (edge + 16));
+  g.fillRect(0, lipBot, W, H - lipBot);
   g.save();
-  g.globalAlpha = 0.3;
+  g.globalAlpha = 0.28;
   g.strokeStyle = COLORS.counterSeam;
   g.lineWidth = 3;
   for (let x = 120; x < W; x += 240) {
     g.beginPath();
-    g.moveTo(x, edge + 18);
+    g.moveTo(x, lipBot + 2);
     g.lineTo(x, H);
     g.stroke();
   }
-  g.restore();
-  g.save();
-  g.globalAlpha = 0.25;
+  g.globalAlpha = 0.22;
   g.strokeStyle = COLORS.counterSeamHi;
   g.lineWidth = 1.5;
   for (let x = 121; x < W; x += 240) {
     g.beginPath();
-    g.moveTo(x, edge + 18);
+    g.moveTo(x, lipBot + 2);
     g.lineTo(x, H);
     g.stroke();
   }
   g.restore();
+  /* 5a) 亮边往下投的阴影: 立面顶部压暗一条 */
+  const aoc = g.createLinearGradient(0, lipBot, 0, lipBot + 22);
+  aoc.addColorStop(0, 'rgba(40,20,8,0.5)');
+  aoc.addColorStop(1, 'rgba(40,20,8,0)');
+  g.fillStyle = aoc;
+  g.fillRect(0, lipBot, W, 22);
 
-  /* 6) 卡通轮廓线: 台面 + 前沿各描一圈 */
+  /* 6) 卡通轮廓线: 台面 + 前沿各描一圈(整体下移一点, 别描到蒙板线以上) */
   g.save();
-  g.globalAlpha = 0.5;
-  strokeRoundRect(g, -28, topY, W + 56, topH, 18, OUT, 2.5);
-  strokeRoundRect(g, -28, edge - 4, W + 56, 20, 10, OUT, 2);
+  g.globalAlpha = 0.45;
+  strokeRoundRect(g, -28, topY + 1.5, W + 56, lipTop - topY, 13, OUT, 2.5);
+  strokeRoundRect(g, -28, lipTop, W + 56, lipBot - lipTop, 10, OUT, 2);
   g.restore();
   g.restore();
 }
@@ -999,20 +1377,36 @@ function drawCustomers(g) {
     const cx = r.x + r.w / 2;
     const enterP = clamp(c.enterT, 0, 1);
     const leaveP = c.state === 'waiting' ? 0 : clamp((c.leaveT || 0) / 0.8, 0, 1);
-    /* 从右侧滑入; 服务完/发怒后向右滑走 */
+    const fly = c.fly || null; // 被击飞中
+    /* 从右侧滑入; 服务完/发怒后向右滑走; 被击飞的按抛物线甩出去并翻滚 */
     const easeEnter = 1 - Math.pow(1 - enterP, 3);
-    const offX = (1 - easeEnter) * 300 + leaveP * 340;
-    const alpha = enterP * (1 - leaveP * leaveP);
+    let offX = (1 - easeEnter) * 300 + leaveP * 340;
+    let offY = 0;
+    let alpha = enterP * (1 - leaveP * leaveP);
+    let rot = 0;
+    if (fly) {
+      offX = fly.x;
+      offY = fly.y;
+      rot = fly.rot;
+      alpha = clamp(1 - Math.max(0, fly.t - 0.5) / 0.8, 0, 1); // 飞出去后段淡出
+    }
     if (alpha <= 0.01) continue;
 
     g.save();
     g.globalAlpha = alpha;
-    g.translate(offX, 0);
+    g.translate(offX, offY);
+    if (fly) {
+      /* 绕身体中段翻滚 */
+      const pivotY = LAYOUT.counterY - LAYOUT.stand.headH * 0.45;
+      g.translate(cx, pivotY);
+      g.rotate(rot);
+      g.translate(-cx, -pivotY);
+    }
 
     const baseY = LAYOUT.counterY + 44; // 脚被柜台挡住
     const h = LAYOUT.stand.headH;
     const bobY = c.state === 'waiting' ? Math.sin(c.bob) * 3 : 0;
-    const shakeX = c.state === 'angry' ? Math.sin(c.bob * 6) * 3 : 0;
+    const shakeX = c.state === 'angry' && !fly ? Math.sin(c.bob * 6) * 3 : 0;
 
     g.save();
     g.translate(shakeX, bobY);
@@ -1026,13 +1420,114 @@ function drawCustomers(g) {
   }
 }
 
-/* 客人立绘(npc.png); 缺图时画一个人形占位(上半身) */
-function drawCustomerFigure(g, c, cx, baseY, h) {
-  if (drawNpc(g, c.def.npcIndex || 0, cx, baseY, h)) return;
-
+/* 立绘占位: 竖排「顾 / 客」二字(DAY.customerTextPlaceholder, 等美术交付后关掉) */
+function drawCustomerPlaceholder(g, c, cx, baseY, h) {
+  const special = c.def.kind === 'special';
   const headR = h * 0.2;
   const headY = baseY - h + headR;
+
+  /* 身子 + 头(和缺图占位同一套几何) */
+  g.save();
+  fillRoundRect(g, cx - h * 0.26, headY + headR * 0.6, h * 0.52, h, h * 0.16,
+    special ? 'rgba(196,158,86,0.4)' : 'rgba(67,48,34,0.95)');
+  g.beginPath();
+  g.arc(cx, headY, headR, 0, Math.PI * 2);
+  g.fillStyle = special ? COLORS.gold : COLORS.panelLight;
+  g.fill();
+  g.strokeStyle = special ? COLORS.goldLight : 'rgba(196,158,86,0.5)';
+  g.lineWidth = special ? 3 : 2;
+  g.stroke();
+  g.restore();
+
+  /* 竖排「顾 / 客」 */
+  const size = h * 0.2;
+  const ink = special ? COLORS.goldLight : COLORS.cream;
+  const outline = 'rgba(38,22,10,0.8)';
+  drawText(g, '顾', cx, headY + size * 1.5, {
+    size: size, weight: 700, align: 'center', color: ink, stroke: outline, strokeWidth: 3.5,
+  });
+  drawText(g, '客', cx, headY + size * 2.7, {
+    size: size, weight: 700, align: 'center', color: ink, stroke: outline, strokeWidth: 3.5,
+  });
+}
+
+/* 柜台上摆好的月饼(烤好先摆这里, 腾出烤位) */
+function drawPlates(g) {
+  const draggingIdx = game.drag && game.drag.kind === DRAG.PLATE ? game.drag.index : -1;
+  for (let i = 0; i < run.plates.length; i++) {
+    if (i === draggingIdx) continue; // 正在拖的那块不画(跟手)
+    const p = run.plates[i];
+    /* 台面投影 */
+    g.save();
+    g.globalAlpha = 0.22;
+    g.fillStyle = '#3a1f0d';
+    g.beginPath();
+    g.ellipse(p.x, p.y + PLATE_R * 0.72, PLATE_R * 0.95, PLATE_R * 0.34, 0, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+    drawSlotMoon(g, { crustId: p.moon.crustId, fillings: p.moon.fillings }, p.x, p.y, PLATE_R, { wrapped: true });
+    if (p.moon.burnt) {
+      drawText(g, '糊', p.x + PLATE_R - 2, p.y - PLATE_R + 2, {
+        size: 13, weight: 700, color: COLORS.fail, stroke: 'rgba(40,20,10,0.7)', strokeWidth: 3,
+      });
+    }
+  }
+}
+
+/* 击飞冲击: 扩散环 + 放射尖刺 + 「击飞!」大字 */
+function drawImpact(g) {
+  const im = game.impact;
+  if (!im) return;
+  const p = clamp(im.t / 0.6, 0, 1);
+  g.save();
+  g.globalAlpha = 1 - p;
+  /* 两圈扩散冲击环 */
+  g.strokeStyle = COLORS.cream;
+  g.lineWidth = 7 * (1 - p) + 2;
+  g.beginPath();
+  g.arc(im.x, im.y, 18 + p * 96, 0, Math.PI * 2);
+  g.stroke();
+  g.strokeStyle = COLORS.fail;
+  g.lineWidth = 4 * (1 - p) + 1;
+  g.beginPath();
+  g.arc(im.x, im.y, 8 + p * 62, 0, Math.PI * 2);
+  g.stroke();
+  /* 放射尖刺 */
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2 + p * 0.5;
+    const r0 = 22 + p * 44;
+    const r1 = r0 + 36 * (1 - p) + 8;
+    g.strokeStyle = COLORS.goldLight;
+    g.lineWidth = 6 * (1 - p) + 2;
+    g.beginPath();
+    g.moveTo(im.x + Math.cos(ang) * r0, im.y + Math.sin(ang) * r0);
+    g.lineTo(im.x + Math.cos(ang) * r1, im.y + Math.sin(ang) * r1);
+    g.stroke();
+  }
+  g.restore();
+  drawText(g, '击飞!', im.x, im.y - 44 - p * 46, {
+    size: 30, weight: 700, align: 'center',
+    color: COLORS.goldLight, stroke: 'rgba(60,30,10,0.85)', strokeWidth: 5,
+  });
+}
+
+
+
+/* 客人立绘: 普通客人用「普通顾客」贴图; 特殊客人用竖排「顾客」占位(各有设定)
+ * 缺图时退回几何占位(上半身) */
+function drawCustomerFigure(g, c, cx, baseY, h) {
   const special = c.def.kind === 'special';
+  if (special && DAY.customerTextPlaceholder) {
+    drawCustomerPlaceholder(g, c, cx, baseY, h);
+    return;
+  }
+  const idx = c.npcIndex != null ? c.npcIndex : (c.def.npcIndex || 0);
+  if (drawNpc(g, idx, cx, baseY, h, special ? 'npc_special' : 'npc_normal')) return;
+  if (drawNpc(g, idx, cx, baseY, h, 'npc_normal')) return; // 特殊图缺失时退回普通图集
+
+  /* 兜底: 画个几何人形 + 表情 */
+  const headR = h * 0.2;
+  const headY = baseY - h + headR;
   g.save();
   fillRoundRect(g, cx - h * 0.26, headY + headR * 0.6, h * 0.52, h, h * 0.16, special ? 'rgba(196,158,86,0.35)' : 'rgba(67,48,34,0.95)');
   g.beginPath();
@@ -1310,8 +1805,11 @@ function drawMiniOrder(g, order, x, y, w) {
   g.stroke();
 
   const n = order.fillings.length;
-  const step = n > 0 ? Math.min(iconSize, (w - 52) / n) : iconSize;
-  for (let i = 0; i < n; i++) {
+  /* 层数太多(如刘华强的 30 层)只画前几个, 免得图标挤成一团 */
+  const MAX_ICONS = 6;
+  const shown = Math.min(n, MAX_ICONS);
+  const step = shown > 0 ? Math.min(iconSize, (w - 52 - (n > shown ? 30 : 0)) / shown) : iconSize;
+  for (let i = 0; i < shown; i++) {
     const ix = x + 34 + i * step + iconSize / 2;
     if (!drawFillingIcon(g, fillingIndexOf(order.fillings[i]), ix, cy, iconSize)) {
       const f = findFillingDef(order.fillings[i]);
@@ -1320,6 +1818,11 @@ function drawMiniOrder(g, order, x, y, w) {
       g.arc(ix, cy, 20, 0, Math.PI * 2);
       g.fill();
     }
+  }
+  if (n > shown) {
+    drawText(g, 'x' + n, x + 34 + shown * step + 14, cy, {
+      size: 20, weight: 700, align: 'left', color: COLORS.cream, stroke: 'rgba(0,0,0,0.6)', strokeWidth: 3,
+    });
   }
 }
 
@@ -1344,17 +1847,24 @@ function drawHotbar(g) {
     const r = it.rect;
     if (r.y + r.h < a.y || r.y > a.y + a.h) continue;
     const cnt = backpackCount(it.kind, it.id);
-    const def = it.kind === 'crust' ? findCrustDef(it.id) : findFillingDef(it.id);
+    const def = findProductDef(it.kind, it.id);
+    if (!def) continue;
     const empty = cnt <= 0;
     const cy = r.y + r.h / 2;
+    const armed = it.kind === 'hardware' && game.smashItem === it.id;
 
     g.save();
     g.globalAlpha = empty ? 0.45 : 1;
-    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, empty ? '#e7dac0' : COLORS.panelLight);
+    fillRoundRect(g, r.x, r.y, r.w, r.h, 10, armed ? '#ffe6b0' : empty ? '#e7dac0' : COLORS.panelLight);
+    if (armed) strokeRoundRect(g, r.x - 2, r.y - 2, r.w + 4, r.h + 4, 12, COLORS.warn, 3);
 
     let drew = false;
     if (it.kind === 'crust') drew = drawCrustPart(g, def.col, 'raw', r.x + 8, cy - 22, 44, 44);
-    else drew = drawFillingIcon(g, def.index, r.x + 32, cy, 52);
+    else if (it.kind === 'filling') drew = drawFillingIcon(g, def.index, r.x + 32, cy, 52);
+    else if (img('hardware_moon')) {
+      drawSprite(g, 'hardware_moon', r.x + 6, cy - 24, 48, 48); // 五金月饼贴图
+      drew = true;
+    }
     if (!drew) {
       g.fillStyle = def.color;
       g.beginPath();
@@ -1365,8 +1875,8 @@ function drawHotbar(g) {
     drawText(g, def.name, r.x + 62, cy - 8, {
       size: 16, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 120,
     });
-    drawText(g, '售价 💰' + (def.value || 0), r.x + 62, cy + 14, {
-      size: 12, weight: 600, color: COLORS.gold,
+    drawText(g, it.kind === 'hardware' ? '点一下选中' : '售价 💰' + (def.value || 0), r.x + 62, cy + 14, {
+      size: 12, weight: 600, color: it.kind === 'hardware' ? COLORS.warn : COLORS.gold,
     });
     drawText(g, 'x' + Math.floor(cnt), r.x + r.w - 10, cy, {
       size: 18, weight: 700, align: 'right', color: empty ? COLORS.fail : COLORS.gold,
@@ -1379,6 +1889,127 @@ function drawHotbar(g) {
   if (thumb) {
     fillRoundRect(g, a.x + a.w - 8, a.y, 8, a.h, 4, 'rgba(19,16,13,0.5)');
     fillRoundRect(g, thumb.x, thumb.y, thumb.w, thumb.h, 4, 'rgba(196,158,86,0.75)');
+  }
+
+  /* 已选中五金月饼: 底部提示 */
+  if (game.smashItem) {
+    drawText(g, '已选中五金月饼 → 点客人砸飞', s.x + 14, s.y + s.h - 12, {
+      size: 12, weight: 700, color: COLORS.fail, maxWidth: s.w - 24,
+    });
+  }
+}
+
+/* 选中/放下五金月饼 */
+function toggleSmashItem(id, fromX, fromY) {
+  if (game.smashItem === id) {
+    game.smashItem = null;
+    game.smashFrom = null;
+  } else {
+    game.smashItem = id;
+    game.smashFrom = { x: fromX != null ? fromX : LAYOUT.backpack.x + 40, y: fromY != null ? fromY : LAYOUT.backpack.y + 60 };
+  }
+  SFX.click();
+}
+
+/* 五金月饼投出: 先飞出去, 命中后才结算(击飞/扣口碑) */
+function throwHardware(c, fromX, fromY, toX, toY) {
+  const id = game.smashItem;
+  if (!id) return false;
+  if (!backpackTake('hardware', id, 1)) {
+    game.smashItem = null;
+    fail('没有五金月饼了');
+    return false;
+  }
+  game.throws = game.throws || [];
+  game.throws.push({
+    t: 0,
+    dur: 0.34,
+    x0: fromX,
+    y0: fromY,
+    x1: toX,
+    y1: toY,
+    spin: 13,
+    target: c,
+  });
+  /* 还有存货就继续拿着, 方便连砸 */
+  game.smashItem = backpackCount('hardware', id) > 0 ? id : null;
+  SFX.click();
+  return true;
+}
+
+/* 飞行轨迹: 抛物线(先上后下) */
+function throwPos(th, p) {
+  return {
+    x: lerp(th.x0, th.x1, p),
+    y: lerp(th.y0, th.y1, p) - Math.sin(p * Math.PI) * 96,
+  };
+}
+
+/* 推进飞行中的五金月饼; 命中时结算 */
+function updateThrows(dt) {
+  if (!game.throws || !game.throws.length) return;
+  for (let i = game.throws.length - 1; i >= 0; i--) {
+    const th = game.throws[i];
+    th.t += dt;
+    if (th.t < th.dur) continue;
+    game.throws.splice(i, 1);
+    const c = th.target;
+    if (c && c.state === 'waiting') smashImpact(c, th.x1, th.y1); // 客人还在才算命中
+  }
+}
+
+/* 画飞行中的五金月饼(边飞边转) */
+function drawThrows(g) {
+  if (!game.throws || !game.throws.length) return;
+  for (const th of game.throws) {
+    const p = clamp(th.t / th.dur, 0, 1);
+    const pos = throwPos(th, p);
+    g.save();
+    g.translate(pos.x, pos.y);
+    g.rotate(p * th.spin);
+    if (img('hardware_moon')) drawSprite(g, 'hardware_moon', -30, -30, 60, 60);
+    else {
+      g.fillStyle = '#b9c0c7';
+      g.beginPath();
+      g.arc(0, 0, 22, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+  }
+}
+
+/* 命中结算: 击飞 + (普通客人)掉口碑; 找茬的不掉 */
+function smashImpact(c, x, y) {
+  const harass = !!c.def.harass;
+  c.state = 'angry';
+  c.leaveT = 0;
+  c.drivenOff = true;
+  c.leaveSlot = c.dispSlot != null ? c.dispSlot : 0;
+  c.fly = {
+    t: 0, x: 0, y: 0,
+    vx: 560 + Math.random() * 220,
+    vy: -980 - Math.random() * 160,
+    rot: 0,
+    spin: (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 4),
+  };
+  game.impact = { x: x, y: y, t: 0 };
+  addShake(DAY.smashShake || 12);
+
+  if (harass) {
+    /* 打飞找茬的会掉他身上的东西: 刘华强 -> 西瓜刀(只有第一次给, 免得反复刷) */
+    const dropId = c.def.dropComponent;
+    if (dropId && !hasComponentInstalled(dropId) && !(shop.components[dropId] > 0)) {
+      shop.components[dropId] = (shop.components[dropId] || 0) + 1;
+      const cd = findComponentDef(dropId);
+      showScreenText('获得 组件「' + (cd ? cd.name : dropId) + '」', '去工厂装上试试', COLORS.gold);
+      SFX.unlock();
+    }
+    SFX.success();
+  } else {
+    const pen = DAY.smashRepPenalty || 5;
+    shop.reputation = Math.max(0, shop.reputation - pen);
+    addFloater('-' + pen + ' 口碑', 640, 250, COLORS.fail, 1.6);
+    SFX.fail();
   }
 }
 
@@ -1906,6 +2537,9 @@ function drawDragGhost(g, drag) {
   } else if (drag.kind === DRAG.SLOT) {
     const slot = run.slots[drag.index];
     if (slot) drawSlotMoon(g, slot, drag.x, drag.y, 46);
+  } else if (drag.kind === DRAG.PLATE) {
+    const p = run.plates[drag.index];
+    if (p) drawSlotMoon(g, { crustId: p.moon.crustId, fillings: p.moon.fillings }, drag.x, drag.y, PLATE_R, { wrapped: true });
   } else if (drag.kind === DRAG.OVEN) {
     const os = run.oven[drag.index];
     if (os && os.moon) {

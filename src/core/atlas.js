@@ -46,6 +46,33 @@ function drawAtlasFit(g, key, col, row, cols, rows, cx, cy, maxSize) {
 /* 客人图集源矩形
  * - 正方形图 -> 2×2 四宫格(新顾客图), index 0..3, 超出回绕
  * - 宽图 -> 旧版: 上排 4 等分取前 3, 下排 2 个居中(0..4) */
+/* 立绘图集规格: 3×3 九宫格, 中间格(4)留空 -> 每张图 8 个立绘
+ * index 是「逻辑序号」(0..7), 会跳过中间空格映射到实际格子 */
+const NPC_SHEET_SPEC = {
+  npc_normal: { cols: 3, rows: 3, skip: [4] }, // 普通顾客 8 位
+  npc_special: { cols: 3, rows: 3, skip: [4] }, // 特殊客人: 0良子 1刘华强 2史蒂夫, 其余是不同颜色的月兔
+};
+
+function npcCellRect(image, index, spec) {
+  const W = image.naturalWidth || image.width;
+  const H = image.naturalHeight || image.height;
+  const cw = W / spec.cols;
+  const ch = H / spec.rows;
+  const cells = [];
+  for (let i = 0; i < spec.cols * spec.rows; i++) {
+    if (!spec.skip || spec.skip.indexOf(i) < 0) cells.push(i);
+  }
+  const n = cells.length || 1;
+  const cell = cells[((index % n) + n) % n];
+  return {
+    sx: (cell % spec.cols) * cw,
+    sy: Math.floor(cell / spec.cols) * ch,
+    sw: cw,
+    sh: ch,
+  };
+}
+
+/* 旧规则(等宽/四宫格), 没有 spec 的图集走这里 */
 function npcSrcRect(image, index) {
   const W = image.naturalWidth;
   const H = image.naturalHeight;
@@ -67,10 +94,12 @@ function npcSrcRect(image, index) {
 }
 
 /* 画某位 npc 立绘(以脚底中心对齐 x, baseY, 高度 h) */
-function drawNpc(g, index, cx, baseY, h) {
-  const image = img('npc');
+function drawNpc(g, index, cx, baseY, h, key) {
+  const k = key || 'npc_normal';
+  const image = img(k);
   if (!image) return false;
-  const s = npcSrcRect(image, index);
+  const spec = NPC_SHEET_SPEC[k];
+  const s = spec ? npcCellRect(image, index, spec) : npcSrcRect(image, index);
   const hh = h * (ICON_SCALE || 1);
   const w = (s.sw / s.sh) * hh;
   g.drawImage(image, s.sx, s.sy, s.sw, s.sh, cx - w / 2, baseY - hh, w, hh);

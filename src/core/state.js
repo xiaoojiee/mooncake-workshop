@@ -45,6 +45,7 @@ const run = {
   paused: false, // 是否暂停(菜单/结算)
   factoryOpen: false, // 工厂面板是否打开(不暂停游戏)
   money: [], // 撒在柜台上的金币 [{ x,y,vx,vy,value,life,rest,spin }]
+  plates: [], // 摆到柜台上的烤好月饼 [{ moon, x, y }] (先把烤位腾出来)
   cart: { x: 640, dir: 1 }, // 收银小车的位置/方向(柜台升级解锁后生效)
   powerOn: false, // 是否开业通电(只有营业中为 true, 工厂才生产)
   pendingPlan: null, // (旧)备货时预生成的今日客人计划
@@ -167,37 +168,54 @@ function addShake(power) {
 }
 
 /* 指针事件分发: input.js 调用
- * 全局背包浮窗最优先, 其次才转发给当前场景 */
+ * 全局背包浮窗最优先, 其次才转发给当前场景
+ * 启动/加载页不显示挂件, 也不响应它们的点击 */
+function chromeVisible() {
+  return typeof hudChromeVisible === 'function' ? hudChromeVisible() : true;
+}
 function handlePointerDown(x, y) {
-  if (typeof benchUpgradeHandleDown === 'function' && benchUpgradeHandleDown(x, y)) return;
-  if (typeof stockingHandleDown === 'function' && stockingHandleDown(x, y)) return;
-  if (typeof backpackHandleDown === 'function' && backpackHandleDown(x, y)) return;
-  if (typeof debugHandleDown === 'function' && debugHandleDown(x, y)) return;
+  if (chromeVisible()) {
+    if (typeof benchUpgradeHandleDown === 'function' && benchUpgradeHandleDown(x, y)) return;
+    if (typeof stockingHandleDown === 'function' && stockingHandleDown(x, y)) return;
+    if (typeof backpackHandleDown === 'function' && backpackHandleDown(x, y)) return;
+    if (typeof debugHandleDown === 'function' && debugHandleDown(x, y)) return;
+  }
   const s = scenes.current;
   if (s && s.onDown) s.onDown(x, y);
 }
 function handlePointerMove(x, y) {
-  if (typeof benchUpgradeHandleMove === 'function' && benchUpgradeHandleMove(x, y)) return;
-  if (typeof stockingHandleMove === 'function' && stockingHandleMove(x, y)) return;
-  if (typeof backpackHandleMove === 'function' && backpackHandleMove(x, y)) return;
+  if (chromeVisible()) {
+    if (typeof benchUpgradeHandleMove === 'function' && benchUpgradeHandleMove(x, y)) return;
+    if (typeof stockingHandleMove === 'function' && stockingHandleMove(x, y)) return;
+    if (typeof backpackHandleMove === 'function' && backpackHandleMove(x, y)) return;
+  }
   const s = scenes.current;
   if (s && s.onMove) s.onMove(x, y);
 }
 function handlePointerUp(x, y) {
-  if (typeof benchUpgradeHandleUp === 'function' && benchUpgradeHandleUp(x, y)) return;
-  if (typeof stockingHandleUp === 'function' && stockingHandleUp(x, y)) return;
-  if (typeof backpackHandleUp === 'function' && backpackHandleUp(x, y)) return;
+  if (chromeVisible()) {
+    if (typeof benchUpgradeHandleUp === 'function' && benchUpgradeHandleUp(x, y)) return;
+    if (typeof stockingHandleUp === 'function' && stockingHandleUp(x, y)) return;
+    if (typeof backpackHandleUp === 'function' && backpackHandleUp(x, y)) return;
+  }
   const s = scenes.current;
   if (s && s.onUp) s.onUp(x, y);
 }
 function handleWheel(x, y, delta) {
-  if (typeof benchUpgradeHandleWheel === 'function' && benchUpgradeHandleWheel(x, y, delta)) return;
-  if (typeof stockingHandleWheel === 'function' && stockingHandleWheel(x, y, delta)) return;
-  if (typeof backpackHandleWheel === 'function' && backpackHandleWheel(x, y, delta)) return;
+  if (chromeVisible()) {
+    if (typeof benchUpgradeHandleWheel === 'function' && benchUpgradeHandleWheel(x, y, delta)) return;
+    if (typeof stockingHandleWheel === 'function' && stockingHandleWheel(x, y, delta)) return;
+    if (typeof backpackHandleWheel === 'function' && backpackHandleWheel(x, y, delta)) return;
+  }
   const s = scenes.current;
   if (s && s.onWheel) s.onWheel(x, y, delta);
 }
 function onKeyDown(e) {
+  /* 测试键(+/= 加金币, 1~5 特殊客人, 0 打烊) */
+  if (typeof hudChromeVisible === 'function' && hudChromeVisible() &&
+    typeof debugHandleKey === 'function' && debugHandleKey(e.key)) {
+    return;
+  }
   if (e.key === 'Escape') {
     /* 工厂面板打开时, Esc 先关面板, 不退出营业 */
     if (run.factoryOpen) {

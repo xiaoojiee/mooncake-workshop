@@ -7,8 +7,9 @@
  * - 由 state.js 的指针分发在最前面拦截, main.js 统一绘制
  */
 
-/* global W, H, COLORS, shop, run, scenes, CRUSTS, FILLINGS, isUnlocked, findCrustDef,
-   findFillingDef, backpackCount, backpackTake, backpackAdd, drawCrustPart, drawFillingIcon,
+/* global W, H, COLORS, shop, run, scenes, CRUSTS, FILLINGS, HARDWARE, isUnlocked, findCrustDef,
+   findFillingDef, findHardwareDef, backpackCount, backpackTake, backpackAdd, drawCrustPart,
+   drawFillingIcon, img, drawSprite,
    fillRoundRect, strokeRoundRect, roundRect, drawText, uiButton, pointInRect, clamp, SFX,
    slotRect, placeCrust, placeFilling, ASSEMBLY */
 
@@ -57,6 +58,15 @@ function backpackProductDefs() {
       defs.push({
         kind: 'filling', id: d.id, name: d.name, index: d.index, color: d.color,
         value: d.value || 0, effectText: d.effectText || '',
+      });
+    }
+  }
+  /* 道具(五金月饼) */
+  for (const d of HARDWARE) {
+    if (isUnlocked(d) || backpackCount('hardware', d.id) > 0) {
+      defs.push({
+        kind: 'hardware', id: d.id, name: d.name, color: d.color, icon: d.icon,
+        value: 0, effectText: d.effectText || '',
       });
     }
   }
@@ -223,7 +233,11 @@ function drawBackpackWindow(g) {
 
     let drew = false;
     if (it.kind === 'crust') drew = drawCrustPart(g, it.col, 'raw', cx - 23, r.y + 8, 46, 46);
-    else drew = drawFillingIcon(g, it.index, cx, r.y + 34, 56);
+    else if (it.kind === 'filling') drew = drawFillingIcon(g, it.index, cx, r.y + 34, 56);
+    else if (img('hardware_moon')) {
+      drawSprite(g, 'hardware_moon', cx - 26, r.y + 8, 52, 52);
+      drew = true;
+    }
     if (!drew) {
       g.fillStyle = it.color;
       g.beginPath();
@@ -268,6 +282,15 @@ function drawBackpackWindow(g) {
       const cd = findCrustDef(d.productId);
       if (!drawCrustPart(g, cd ? cd.col : 0, 'raw', d.x - 34, d.y - 34, 68, 68)) {
         g.fillStyle = cd ? cd.color : COLORS.crust;
+        g.beginPath();
+        g.arc(d.x, d.y, 26, 0, Math.PI * 2);
+        g.fill();
+      }
+    } else if (d.kind === 'hardware') {
+      const hd = findHardwareDef(d.productId);
+      if (img('hardware_moon')) drawSprite(g, 'hardware_moon', d.x - 32, d.y - 32, 64, 64);
+      else {
+        g.fillStyle = hd ? hd.color : COLORS.textDim;
         g.beginPath();
         g.arc(d.x, d.y, 26, 0, Math.PI * 2);
         g.fill();

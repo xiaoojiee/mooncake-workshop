@@ -108,6 +108,16 @@ const FILLINGS = [
   },
 ];
 
+/* ---- 道具(工厂产出, 不进订单, 只能手动用) ----
+ * 五金月饼: 快捷栏点一下选中, 再点客人 -> 砸飞他 */
+const HARDWARE = [
+  {
+    id: 'hardware_moon', name: '五金月饼', color: '#b9c0c7', icon: '🔩',
+    factory: 'factory_hardware', value: 0,
+    effectText: '选中后点客人: 砸飞他（普通客人会掉口碑，找茬的不掉）',
+  },
+];
+
 /* ---- 工厂 ----
  * 产出刻意压得很低: 前几天的原料「刚好够用」, 逼玩家规划开槽/装组件提产
  * speed 单位: 份/秒; 一天约 2~3 分钟营业时间, 故 speed 0.3 ≈ 一天多产 40~55 份
@@ -130,6 +140,9 @@ const FACTORIES = [
   { id: 'factory_filling_furou', kind: 'filling', productId: 'furou', name: '刷怪塔', baseSpeed: 0.075, baseCapacity: 20, baseQuality: 1, cost: 450 },
   /* 自动设施: 吸料塔 —— 不生产, 通电后自动把全场掉落的产物吸进背包
    * baseSpeed 此时表示「每秒吸几个」 */
+  /* 道具工厂: 产五金月饼(砸客人用) */
+  { id: 'factory_hardware', kind: 'hardware', productId: 'hardware_moon', name: '五金月饼工坊', baseSpeed: 0.05, baseCapacity: 6, baseQuality: 1, cost: 600 },
+
   { id: 'factory_vacuum', kind: 'util', productId: null, name: '吸料塔', baseSpeed: 1.0, baseCapacity: 0, baseQuality: 1, cost: 1200 },
 ];
 
@@ -303,15 +316,49 @@ const ORDER_TEMPLATES = [
 ];
 
 /* ---- 客人 ----
- * npcIndex: 在 npc.png 中的立绘序号(0..4) */
+ * 普通客人: npcIndex = 普通npc.png(3×3 中间空)的逻辑序号 0..7, 顺序同图集扫描线:
+ *   0 黄头巾围裙女生 / 1 蓝白棒球帽男生 / 2 灰发眼镜奶奶 / 3 草帽花裙女生 /
+ *   4 红贝雷帽金发画家 / 5 灰礼帽白胡子大爷 / 6 橙遮阳帽黄卫衣学生 / 7 双丸子头旗袍女生
+ * 特殊客人: npcIndex = 特殊npc.png 的逻辑序号(0良子 1刘华强 2史蒂夫 3+ 月兔) */
 const CUSTOMERS = [
   /* reward: 基础工钱(馅料价值另算, 见 order.js fillingBonus) */
-  { id: 'c1', kind: 'normal', name: '瓜摊老板', npcIndex: 0, reward: 24, quip: '你这瓜保熟吗？' },
-  { id: 'c2', kind: 'normal', name: '大厨', npcIndex: 1, reward: 26, quip: '给我来份拿手的' },
-  { id: 'c3', kind: 'normal', name: '潮男', npcIndex: 2, reward: 28, quip: '要拍照好看的那种' },
-  { id: 'c4', kind: 'normal', name: '花衬衫大叔', npcIndex: 3, reward: 25, quip: '多放点料！' },
-  { id: 'c5', kind: 'normal', name: '黑衬衫小哥', npcIndex: 4, reward: 27, quip: '随便来一个' },
-  { id: 'c6', kind: 'special', name: '嫦娥', npcIndex: 1, reward: 80, rewardItem: 'item_moon_mold', minDay: 2, quip: '来块月饼，要圆的' },
+  { id: 'c1', kind: 'normal', name: '围裙小妹', npcIndex: 0, reward: 24, quip: '我会做月饼！' },
+  { id: 'c2', kind: 'normal', name: '送货小哥', npcIndex: 1, reward: 26, quip: '跑一天了，来块月饼' },
+  { id: 'c3', kind: 'normal', name: '邻家奶奶', npcIndex: 2, reward: 23, quip: '少放点糖，牙口不好' },
+  { id: 'c4', kind: 'normal', name: '郊游姑娘', npcIndex: 3, reward: 27, quip: '要拍照好看的那种' },
+  { id: 'c5', kind: 'normal', name: '金发画家', npcIndex: 4, reward: 28, quip: '这个颜色配月饼真好看' },
+  { id: 'c11', kind: 'normal', name: '白胡子大爷', npcIndex: 5, reward: 25, quip: '配茶吃正好' },
+  { id: 'c12', kind: 'normal', name: '黄卫衣学生', npcIndex: 6, reward: 24, quip: '随便来一个' },
+  { id: 'c13', kind: 'normal', name: '旗袍姑娘', npcIndex: 7, reward: 29, quip: '五仁的多来点' },
+  { id: 'c6', kind: 'special', name: '嫦娥', npcIndex: 3, reward: 80, rewardItem: 'item_moon_mold', minDay: 2, quip: '来块月饼，要圆的' },
+
+  /* ---- 特殊客人(各有怪癖) ----
+   * order.kind 决定点单规则, 见 order.js 的 buildOrder:
+   *   melon30   要 30 份西瓜馅(根本做不出来) -> 找茬, 只能反复点击赶走
+   *   tripleRot 馅料是普通客人的 3 倍; 菜单里有腐肉就全点腐肉
+   *   moonRabbit 完成后恢复所有客人的耐心
+   *   rotOnly   只点腐肉; 没上场腐肉就只要一张饼皮 */
+  {
+    id: 'c7', kind: 'special', name: '刘华强', npcIndex: 1, reward: 60, minDay: 2,
+    harass: true, order: { kind: 'melon30' },
+    dropComponent: 'melonblade', // 被五金月饼打飞会掉「西瓜刀」(首次)
+    quip: '你这瓜保熟吗？给我来三十份西瓜馅的',
+  },
+  {
+    id: 'c8', kind: 'special', name: '良子', npcIndex: 0, reward: 70, minDay: 3,
+    order: { kind: 'tripleRot' },
+    quip: '料给我放三倍，有腐肉就全上腐肉',
+  },
+  {
+    id: 'c9', kind: 'special', name: '月兔', npcIndex: 3, npcRandom: [4, 7], reward: 75, minDay: 4,
+    order: { kind: 'moonRabbit' }, onServe: 'restorePatience',
+    quip: '捣药捣累了…来块月饼，大家都歇会儿',
+  },
+  {
+    id: 'c10', kind: 'special', name: '史蒂夫', npcIndex: 2, reward: 65, minDay: 3,
+    order: { kind: 'rotOnly' },
+    quip: '腐肉，只要腐肉',
+  },
 ];
 
 /* ---- 查询辅助 ---- */
@@ -326,6 +373,23 @@ function findFactoryDef(id) {
 }
 function findItemDef(id) {
   return ITEMS.find((i) => i.id === id) || null;
+}
+function findHardwareDef(id) {
+  return HARDWARE.find((h) => h.id === id) || null;
+}
+/* 按「背包类别」取产物定义: crust / filling / hardware */
+function findProductDef(kind, id) {
+  if (kind === 'crust') return findCrustDef(id);
+  if (kind === 'filling') return findFillingDef(id);
+  if (kind === 'hardware') return findHardwareDef(id);
+  return null;
+}
+/* 某类别下所有产物定义 */
+function productDefsOf(kind) {
+  if (kind === 'crust') return CRUSTS;
+  if (kind === 'filling') return FILLINGS;
+  if (kind === 'hardware') return HARDWARE;
+  return [];
 }
 function fillingColorOf(id) {
   const def = findFillingDef(id);

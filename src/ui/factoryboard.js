@@ -14,7 +14,7 @@
  */
 
 /* global shop, run, W, H, COLORS, GRID, CORE, PRODUCE, FACTORIES, COMPONENT_TYPES, CRUSTS, FILLINGS,
-   findFactoryDef, findCrustDef, findFillingDef, findComponentDef, componentEffectText, isUnlocked, unlockLabel,
+   findFactoryDef, findCrustDef, findFillingDef, findProductDef, findComponentDef, HARDWARE, componentEffectText, isUnlocked, unlockLabel,
    unitsList, unitAtCell, poweredUnitIds, isUnitPowered, coreLevel, coreCapacity,
    coreUpgradeCost, applyCoreUpgrade, deployFactory, undeployUnit, moveUnit, unitKind,
    collectDrop, collectAllDrops, buyFactory, sellFactory, buyComponent, sellComponent,
@@ -176,7 +176,7 @@ function factoryBoardSweep(x, y) {
 function fbDrawDrops(g) {
   const t = performance.now() / 1000;
   for (const d of factoryBoardDrops) {
-    const def = d.kind === 'crust' ? findCrustDef(d.productId) : findFillingDef(d.productId);
+    const def = findProductDef(d.kind, d.productId);
     const color = def ? def.color : COLORS.panelInk;
     const bob = d.rest ? Math.sin(t * 4 + d.spin) * 1.6 : 0;
     const x = d.x;
@@ -639,14 +639,16 @@ function drawWarehouseComponents(g) {
 
 function drawBackpackTab(g) {
   let y = FB.top + 76;
+  const KIND_NAME = { crust: '饼皮', filling: '馅料', hardware: '道具' };
   const kinds = [
     { kind: 'crust', defs: typeof CRUSTS !== 'undefined' ? CRUSTS : [] },
     { kind: 'filling', defs: typeof FILLINGS !== 'undefined' ? FILLINGS : [] },
+    { kind: 'hardware', defs: typeof HARDWARE !== 'undefined' ? HARDWARE : [] },
   ];
   for (const group of kinds) {
     const got = group.defs.filter((d) => backpackCount(group.kind, d.id) > 0);
     if (!got.length) continue;
-    drawText(g, group.kind === 'crust' ? '饼皮' : '馅料', FB.leftX + 16, y, { size: 14, weight: 700, color: COLORS.panelTitle });
+    drawText(g, KIND_NAME[group.kind] || '产物', FB.leftX + 16, y, { size: 14, weight: 700, color: COLORS.panelTitle });
     y += 26;
     for (const d of got) {
       fillRoundRect(g, FB.leftX + 12, y - 15, FB.leftW - 24, 36, 8, 'rgba(202,136,63,0.16)');
@@ -909,7 +911,9 @@ function drawShopModal(g) {
     drawCard(g, r.x, r.y, r.w, r.h, 12, afford);
 
     if (isFactory) {
-      const kindLabel = def.kind === 'crust' ? '饼皮工厂' : def.kind === 'util' ? '自动设施（吸相邻4格）' : '馅料工厂';
+      const kindLabel = def.kind === 'crust' ? '饼皮工厂'
+        : def.kind === 'util' ? '自动设施（吸相邻4格）'
+          : def.kind === 'hardware' ? '道具工厂（产五金月饼）' : '馅料工厂';
       const iconKey = def.kind === 'crust' ? 'factory_crust' : def.kind === 'filling' ? 'factory_filling' : null;
       if (iconKey && img(iconKey)) {
         drawSprite(g, iconKey, r.x + 10, r.y + 16, 56, 56);
@@ -989,7 +993,7 @@ function drawProductDot(g, x, y, def) {
   if (def) {
     if (def.kind === 'util') color = COLORS.icy;
     else {
-      const p = def.kind === 'crust' ? findCrustDef(def.productId) : findFillingDef(def.productId);
+      const p = findProductDef(def.kind, def.productId);
       if (p) color = p.color;
     }
   }

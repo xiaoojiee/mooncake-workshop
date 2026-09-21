@@ -9,7 +9,7 @@
    pointInRect, clamp, uiHeader, createSlot, createOvenSlot, benchSlotCount,
    drawCustomers, drawCounter, drawMoney, drawCart, drawHotbar, drawBench, drawOven,
    drawBg, drawFallbackBg, hintText, fillRoundRect, strokeRoundRect, benchUpgradeToggle,
-   stockingUI, stockingOpen, benchUpgradeUI, slotUpgradeButtons */
+   stockingUI, stockingOpen, benchUpgradeUI, slotUpgradeButtons, signDimAlpha, signRect */
 
 const menuState = {
   buttons: [],
@@ -48,7 +48,7 @@ function menuDisplayInit() {
 }
 
 /* 牌子立在柜台后面: 从 HUD 下方吊下来, 底端越过柜台前沿(被柜台挡住) */
-const SIGN = { w: 250, h: 142, cy: 214 };
+const SIGN = { w: 250, h: 142, cy: 198 };
 
 function signRect() {
   return { x: W / 2 - SIGN.w / 2, y: SIGN.cy - SIGN.h / 2, w: SIGN.w, h: SIGN.h };
@@ -224,6 +224,9 @@ function drawFlipSign(g) {
     });
     drawText(g, '🌙', cx, r.y + 102, { size: 19, align: 'center' });
   }
+  /* 闭店蒙板: 画在「翻转变换」里, 所以牌子翻动时它跟着一起缩放(不会留在原地) */
+  const dim = signDimAlpha(open);
+  if (dim > 0) fillRoundRect(g, r.x, r.y, r.w, r.h, 16, 'rgba(0,0,0,' + dim + ')');
   g.restore();
 
   /* 未翻转时轻微呼吸提示 */

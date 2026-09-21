@@ -2,7 +2,8 @@
 
 /* 订单流程(多客人并发): 生成当天客人计划, 到店, 耐心衰减, 结算与流失 */
 
-/* global shop, run, ORDER_TEMPLATES, CUSTOMERS, CRUSTS, DAY, findCrustDef, findFillingDef,
+/* global shop, run, ORDER_TEMPLATES, CUSTOMERS, CRUSTS, FILLINGS, ASSEMBLY, DAY,
+   moonQuality, findCrustDef, findFillingDef,
    findItemDef, isUnlocked, unlockedCrusts, addFloater, SFX, showScreenText, submitScores,
    saveGame, starOf, scoreServe, pick, rand, clamp, rollComponentDrop, COLORS */
 
@@ -86,34 +87,68 @@ function randomCrustId() {
 function randomCustomer(day) {
   const pool = CUSTOMERS.filter((c) => c.kind !== 'special' && (c.minDay == null || c.minDay <= day));
   let cust = pick(pool.length ? pool : CUSTOMERS);
-  /* 特殊客人小概率出现 */
+  /* 特殊客人小概率出现: 在有资格的几位里随机抽 */
   const specials = CUSTOMERS.filter((c) => c.kind === 'special' && (c.minDay == null || c.minDay <= day));
-  if (specials.length && Math.random() < 0.08) cust = specials[0];
+  if (specials.length && Math.random() < (DAY.specialChance || 0.1)) cust = pick(specials);
   return cust;
+}
+
+/* 按客人规则生成订单(普通客人随机; 特殊客人有怪癖, 见 defs.js 的 order.kind) */
+function buildOrder(custDef, day) {
+  const crustId = randomCrustId();
+  const pool = menuFillings().map((f) => f.id);
+  const hasRot = pool.indexOf('furou') >= 0; // 腐肉是否已上场(进了今日菜单)
+  const base = rollFillings(day);
+  const kind = custDef.order ? custDef.order.kind : null;
+  const cap = ASSEMBLY.maxFillings;
+
+  /* 刘华强: 30 份西瓜馅 -> 远超层数上限, 根本做不出来, 只能反复点击赶走 */
+  if (kind === 'melon30') return { crustId: crustId, fillings: new Array(30).fill('xigua'), qty: 1 };
+
+  /* 史蒂夫: 只要腐肉; 没上场腐肉就只要一张饼皮 */
+  if (kind === 'rotOnly') {
+    return { crustId: crustId, fillings: hasRot ? new Array(Math.min(base.length, cap)).fill('furou') : [], qty: 1 };
+  }
+
+  /* 良子: 馅料是普通客人的 3 倍; 菜单里有腐肉就全点腐肉 */
+  if (kind === 'tripleRot') {
+    if (hasRot) return { crustId: crustId, fillings: new Array(Math.min(base.length * 3, cap)).fill('furou'), qty: 1 };
+    const out = [];
+    for (let i = 0; i < 3 && out.length < cap; i++) {
+      for (const f of base) {
+        if (out.length >= cap) break;
+        out.push(f);
+      }
+    }
+    return { crustId: crustId, fillings: out, qty: 1 };
+  }
+
+  /* 月兔 / 普通客人: 常规随机 */
+  return { crustId: crustId, fillings: base, qty: rollQty(day) };
 }
 
 /* 构造客人实例 */
 function makeCustomer(custDef, day) {
-  const fillings = rollFillings(day);
-  const qty = rollQty(day);
+  const order = buildOrder(custDef, day);
+  const fillings = order.fillings;
+  const qty = order.qty;
 
   /* 耐心: 层数越多、数量越多, 给的时间越充裕(否则不可能完成) */
-  const work = fillings.length + (qty - 1) * 0.6;
+  const work = Math.min(fillings.length, ASSEMBLY.maxFillings) + (qty - 1) * 0.6;
   let patience =
     DAY.patienceBase - (day - 1) * DAY.patienceDecay + work * DAY.patiencePerLayer;
   patience = Math.max(DAY.patienceMin, patience);
   if (custDef.kind === 'special') patience *= DAY.specialPatience;
+  if (custDef.harass) patience *= 2.2; // 找茬的: 给足时间让玩家点走他
   patience = Math.round(patience);
-
-  const order = {
-    crustId: randomCrustId(),
-    fillings: fillings,
-    qty: qty,
-  };
 
   return {
     def: custDef,
     order,
+    /* 立绘格子: 有 npcRandom 的(月兔)每次随机挑一个颜色 */
+    npcIndex: custDef.npcRandom
+      ? Math.floor(rand(custDef.npcRandom[0], custDef.npcRandom[1] + 1))
+      : (custDef.npcIndex || 0),
     patienceMax: patience,
     patienceLeft: patience,
     state: 'waiting', // waiting | served | angry
@@ -243,7 +278,9 @@ function serveCustomer(customer, moon) {
 
   const qty = 1;
   const bonus = moonValue(moon); // 皮+馅 的价值(含特殊功能)
-  let coins = (customer.def.reward + bonus) * qty * (0.5 + r.score);
+  /* 馅料品质: 按「产出该馅料的工厂」加权, 提高出餐金币与口碑 */
+  const q = moonQuality(moon);
+  let coins = (customer.def.reward + bonus) * qty * (0.5 + r.score) * q.price;
   if (customer.def.kind === 'special') coins *= DAY.specialReward;
   if (perfect) {
     run.combo = Math.min(run.combo + 1, 5); // 连击有上限, 免得金币滚雪球
@@ -264,8 +301,9 @@ function serveCustomer(customer, moon) {
   customer.wrongPenalty = penalty;
 
   /* 金币不直接入账: 由 shop 场景把钱撒到柜台上, 玩家点击捡起才结算 */
-  shop.reputation += stars;
-  shop.totalStars += stars;
+  const repGain = stars + q.rep; // 品质越高, 口碑涨得越多
+  shop.reputation += repGain;
+  shop.totalStars += repGain;
   shop.stats.served += 1;
   run.dayServed += 1;
   if (perfect) shop.stats.perfect += 1;
@@ -292,6 +330,15 @@ function serveCustomer(customer, moon) {
     SFX.unlock();
   }
 
+  /* 特殊客人效果: 月兔 -> 恢复所有客人的耐心 */
+  if (customer.def.onServe === 'restorePatience') {
+    for (const c of run.customers) {
+      if (c.state === 'waiting') c.patienceLeft = c.patienceMax;
+    }
+    showScreenText('月兔的祝福', '所有客人的耐心已恢复', COLORS.ok);
+    SFX.unlock();
+  }
+
   if (perfect) addFloater('完美! x' + run.combo, 900, 262, COLORS.ok, 1.6);
   if (penalty > 0) addFloater('粗心 -' + Math.round(penalty * 100) + '%', 900, 300, COLORS.fail, 1.5);
 
@@ -304,6 +351,15 @@ function reapCustomers(dt) {
     const c = run.customers[i];
     if (c.state === 'waiting') continue;
     c.leaveT = (c.leaveT || 0) + dt;
-    if (c.leaveT > 0.8) run.customers.splice(i, 1);
+    /* 被击飞的: 抛物线 + 翻滚, 飞得久一点 */
+    if (c.fly) {
+      const f = c.fly;
+      f.t += dt;
+      f.vy += 2200 * dt; // 重力
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      f.rot += f.spin * dt;
+    }
+    if (c.leaveT > (c.fly ? 1.35 : 0.8)) run.customers.splice(i, 1);
   }
 }

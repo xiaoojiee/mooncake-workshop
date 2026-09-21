@@ -5,7 +5,7 @@
 
 /* global COLORS, input, isUnlocked, img, drawSprite, drawNine, formatNum, SFX, W, H, LAYOUT,
    shop, run, DAY, pointInRect, fillRoundRect, strokeRoundRect, drawText, clamp, BG, clock,
-   currentTheme */
+   counterTopY, setFont */
 
 /* 面板底色: 竖向「顶亮→底暗」渐变(奶油/塑料质感) */
 function panelBody(g, x, y, w, h, base) {
@@ -183,12 +183,17 @@ function uiHeader(g, opts) {
     size: 30, weight: 700, color: COLORS.cream, stroke: COLORS.btnInk, strokeWidth: 4,
   });
 
-  /* 金币 */
+  /* 金币: 数字「右端固定、向左生长」, 金币图标紧贴数字左侧
+   * 这样位数再多也不会顶到右边的「第N天 / 口碑」 */
   const rx = W - 28;
-  drawSprite(g, 'ui_coin', rx - 200, LAYOUT.headerH / 2 - 17, 34, 34);
-  drawText(g, formatNum(shop.coins), rx - 155, LAYOUT.headerH / 2, {
-    size: 24, weight: 700, color: COLORS.cream, stroke: COLORS.btnInk, strokeWidth: 3.5,
+  const numStr = formatNum(shop.coins);
+  setFont(g, 24, 700);
+  const numW = g.measureText(numStr).width;
+  const numRight = rx - 132;
+  drawText(g, numStr, numRight, LAYOUT.headerH / 2, {
+    size: 24, weight: 700, align: 'right', color: COLORS.cream, stroke: '#a35c12', strokeWidth: 3.5,
   });
+  drawSprite(g, 'ui_coin', Math.max(430, numRight - numW - 42), LAYOUT.headerH / 2 - 17, 34, 34);
   drawText(g, '第 ' + shop.day + ' 天', rx - 20, LAYOUT.headerH / 2 - 12, {
     size: 18,
     weight: 700,
@@ -276,7 +281,7 @@ function moonProgress() {
   return clamp(1 - left / dur, 0, 1);
 }
 
-function drawNightSky(g, dim) {
+function drawNightSky(g) {
   g.save();
 
   /* 夜空: 深靛蓝 -> 紫 -> 暖橙地平线(和暖色 UI 衔接) */
@@ -313,35 +318,40 @@ function drawNightSky(g, dim) {
   const mp = moonProgress();
   const mx = W * 0.12 + W * 0.76 * mp;
   const my = 172 - Math.sin(mp * Math.PI) * 58;
-  const mr = 50;
-  const halo = g.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * 4.6);
-  halo.addColorStop(0, 'rgba(255,246,214,0.5)');
-  halo.addColorStop(0.4, 'rgba(255,232,180,0.16)');
-  halo.addColorStop(1, 'rgba(255,232,180,0)');
-  g.fillStyle = halo;
-  g.fillRect(mx - mr * 5, my - mr * 5, mr * 10, mr * 10);
+  const mr = 54;
 
+  /* 光晕: 内圈亮 + 外圈柔(让月亮在夜空里「发光」) */
+  const halo = g.createRadialGradient(mx, my, mr * 0.7, mx, my, mr * 5.2);
+  halo.addColorStop(0, 'rgba(255,250,226,0.85)');
+  halo.addColorStop(0.28, 'rgba(255,242,200,0.38)');
+  halo.addColorStop(0.62, 'rgba(255,236,182,0.13)');
+  halo.addColorStop(1, 'rgba(255,236,182,0)');
+  g.fillStyle = halo;
+  g.fillRect(mx - mr * 5.6, my - mr * 5.6, mr * 11.2, mr * 11.2);
+
+  /* 月盘: 整体提亮, 只有最外缘略暗 */
   g.beginPath();
   g.arc(mx, my, mr, 0, Math.PI * 2);
-  const moon = g.createRadialGradient(mx - mr * 0.32, my - mr * 0.38, mr * 0.1, mx, my, mr * 1.05);
-  moon.addColorStop(0, '#fffdf0');
-  moon.addColorStop(0.62, '#f8ecc6');
-  moon.addColorStop(1, '#e3cf9c');
+  const moon = g.createRadialGradient(mx - mr * 0.3, my - mr * 0.36, mr * 0.08, mx, my, mr * 1.02);
+  moon.addColorStop(0, '#ffffff');
+  moon.addColorStop(0.5, '#fffbe8');
+  moon.addColorStop(0.85, '#fdf1c9');
+  moon.addColorStop(1, '#f2e0ac');
   g.fillStyle = moon;
   g.fill();
 
-  /* 环形山 */
+  /* 环形山(很淡, 只做质感) */
   for (const [dx, dy, r] of MOON_CRATERS) {
     g.beginPath();
     g.arc(mx + dx * mr, my + dy * mr, r * mr, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(184,152,98,0.18)';
+    g.fillStyle = 'rgba(198,168,112,0.13)';
     g.fill();
   }
-  /* 月缘冷光 */
+  /* 月缘亮圈 */
   g.beginPath();
   g.arc(mx, my, mr - 0.5, 0, Math.PI * 2);
-  g.strokeStyle = 'rgba(255,252,232,0.75)';
-  g.lineWidth = 2;
+  g.strokeStyle = 'rgba(255,255,244,0.9)';
+  g.lineWidth = 2.5;
   g.stroke();
 
   /* 低空云带(几缕, 压在地平线附近) */
@@ -355,10 +365,46 @@ function drawNightSky(g, dim) {
   }
   g.globalAlpha = 1;
 
-  /* 打烊/结算: 整体压暗 */
-  if (dim) {
-    g.fillStyle = 'rgba(10,14,34,0.42)';
-    g.fillRect(0, 0, W, H);
+  g.restore();
+}
+
+/* 闭店: 分块给 UI 蒙一层半透明黑(关灯)
+ * 三块: 头顶表头 / 柜台(面板)区 / 牌子(仅开始界面有牌子)
+ * 中间的天空带(月亮所在)不蒙 */
+/* 全局 HUD 挂件(背包/调试按钮 + 各浮窗)只在进入游戏后显示
+ * 启动/加载页不显示, 也不响应点击 */
+function hudChromeVisible() {
+  return run.scene !== 'boot' && run.scene !== 'loading';
+}
+
+/* 蒙板只在「开始界面」用: 加载页/工厂/排行榜/营业场景都不蒙 */
+function closedMaskActive() {
+  return run.scene === 'menu';
+}
+/* 牌子的蒙板: 只在「今日休息」那一面(闭店)时压暗
+ * 由 menu.js 的 drawFlipSign 在翻转变换内绘制, 所以会跟着牌子一起翻转 */
+function signDimAlpha(open) {
+  return closedMaskActive() && !open ? 0.45 : 0;
+}
+function closedMaskRects() {
+  /* 天空带下沿 = 柜台真实上沿; 再往上多吃 2px, 兜住台面描边的抗锯齿边(免得露亮缝) */
+  const top = (typeof counterTopY === 'function') ? counterTopY() : LAYOUT.counterY - 34;
+  const skyBottom = top - 2;
+  return [
+    { x: 0, y: 0, w: W, h: LAYOUT.headerH, r: 0 }, // 头顶栏位
+    { x: 0, y: skyBottom, w: W, h: H - skyBottom, r: 0 }, // 柜台部分
+  ];
+}
+function drawClosedOverlay(g) {
+  if (!closedMaskActive()) return; // 不在开始界面 -> 不蒙
+  const color = 'rgba(0,0,0,0.45)';
+  g.save();
+  for (const r of closedMaskRects()) {
+    if (r.r) fillRoundRect(g, r.x, r.y, r.w, r.h, r.r, color); // 圆角块(牌子)
+    else {
+      g.fillStyle = color;
+      g.fillRect(r.x, r.y, r.w, r.h);
+    }
   }
   g.restore();
 }
@@ -366,8 +412,7 @@ function drawNightSky(g, dim) {
 /* 画背景: 默认程序化星空圆月; BG.sky=false 时走贴图(cover 铺满 + 可上下提拉对位) */
 function drawBg(g, key) {
   if (BG.sky !== false) {
-    /* 闭店(夜主题)时整片天也压暗, 和暗色 UI 呼应 */
-    drawNightSky(g, key === 'bg_closed' || currentTheme() === 'night');
+    drawNightSky(g);
     return;
   }
   const i = img(key);
