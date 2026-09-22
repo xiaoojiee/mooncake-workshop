@@ -339,7 +339,8 @@ const STOCK_START_RATIO = 0.5; // 开局库存占容量比例
  *   注意: B站 submitScore 只收整数(上限 16,777,215), 所以 0~5 分最多 6 位小数(5,000,000) */
 const RATING = {
   stars: 5, // 满分几星
-  decimals: 4, // 精确到小数点后几位(想更细就调大, 上限 6)
+  decimals: 4, // 榜单里保留几位小数(想更细就调大, 上限 6)
+  showDecimals: 1, // 游戏内(顶栏/日终)只显示 1 位小数
   minCount: 20, // 超过这么多位客人评分才有分数
 };
 

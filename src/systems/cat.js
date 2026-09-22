@@ -121,8 +121,8 @@ function catLeave(cat) {
 /* 被玩家打飞(五金月饼 / 五仁月饼): 累计次数, 够了就驯服 */
 function catKnockOut() {
   const cat = shop.cat;
-  if (!cat || cat.gone || cat.held) return false;
-  if (cat.flung) return false;
+  /* 已经离场 / 正在飞出 / 正在走出去的, 都不能再打(否则会「打飞又出现」来回刷) */
+  if (!cat || cat.gone || cat.held || cat.flung || cat.state === 'leave') return false;
   /* 已经驯服的: 它只是躲开, 不计数也不走(自己人) */
   if (catIsTamed()) {
     addFloater('耄耋躲开了 · 它已经是自己人了', cat.x, cat.y - 46, COLORS.panelInk, 1.3);
@@ -131,7 +131,8 @@ function catKnockOut() {
   }
   shop.catHits = (shop.catHits || 0) + 1;
   /* 飞出去 */
-  cat.flung = { t: 0, x: 0, y: 0, vx: (Math.random() < 0.5 ? -1 : 1) * rand(340, 520), vy: -820, rot: 0, spin: rand(-11, 11) };
+  /* 甩得更远一点, 保证是「飞出场外」的观感 */
+  cat.flung = { t: 0, x: 0, y: 0, vx: (Math.random() < 0.5 ? -1 : 1) * rand(420, 640), vy: -920, rot: 0, spin: rand(-12, 12) };
   cat.state = 'idle';
   cat.task = null;
   addShake(9);
@@ -439,7 +440,7 @@ function updateCat(dt) {
   }
   const cat = shop.cat;
 
-  /* 被打飞中: 先飞出去(落地时把位移结算到真实坐标, 飞远了就直接离场) */
+  /* 被打飞中: 飞出去, 落地就离场(不用再走一遍, 否则会「飞出去又走回来」) */
   if (cat.flung) {
     const f = cat.flung;
     f.t += dt;
@@ -452,6 +453,9 @@ function updateCat(dt) {
       cat.x += f.x;
       cat.y += f.y;
       cat.flung = null;
+      cat.state = 'leave';
+      cat.gone = true; // 打飞 = 当场离场
+      cat.backT = Infinity;
     }
     return;
   }

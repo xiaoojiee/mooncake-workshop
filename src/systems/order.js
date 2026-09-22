@@ -100,16 +100,18 @@ function ratingSubmitValue() {
   return Math.round(r * Math.pow(10, RATING.decimals));
 }
 
-/* 把榜单上的整数还原成「4.8523」这种显示文本 */
-function formatRating(v) {
-  return (v / Math.pow(10, RATING.decimals)).toFixed(RATING.decimals);
+/* 把榜单上的整数还原成显示文本
+ *   digits 不给 -> 榜单用的 4 位小数; 游戏内传 RATING.showDecimals(1 位) */
+function formatRating(v, digits) {
+  const d = digits != null ? digits : RATING.decimals;
+  return (v / Math.pow(10, RATING.decimals)).toFixed(d);
 }
 
 /* 顶栏那一行的评分文本(外卖软件那种) */
 function ratingHeaderText() {
   const r = shopRating();
   if (r == null) return '暂无评分';
-  return '评分 ' + r.toFixed(RATING.decimals);
+  return '评分 ' + r.toFixed(RATING.showDecimals); // 游戏内只给 1 位小数
 }
 
 /* 还差几位客人才能上榜 */

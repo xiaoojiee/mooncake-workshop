@@ -2755,7 +2755,7 @@ function drawDayEnd(g) {
     ['流失客人', run.dayLost + ' 位'],
 
     ['店铺评分', (typeof shopRating === 'function' && shopRating() != null)
-      ? formatRating(ratingSubmitValue()) + ' 分 · ' + (shop.ratingCount || 0) + ' 位客人评分'
+      ? formatRating(ratingSubmitValue(), RATING.showDecimals) + ' 分 · ' + (shop.ratingCount || 0) + ' 位客人评分'
       : '评价不足 · ' + (shop.ratingCount || 0) + '/' + (RATING.minCount + 1)],
     ['当前金币', formatNum(shop.coins)],
   ];
