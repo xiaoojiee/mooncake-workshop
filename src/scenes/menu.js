@@ -7,9 +7,10 @@
 /* global scenes, makeScene, ctx, W, H, COLORS, shop, run, LAYOUT, OVEN, interact, Toy,
    drawText, uiButton, uiPanel, drawSprite, img, hitButton, SFX, resetGame, formatNum,
    pointInRect, clamp, uiHeader, createSlot, createOvenSlot, benchSlotCount,
-   drawCustomers, drawCounter, drawMoney, drawCart, drawHotbar, drawBench, drawOven,
+   drawCustomers, drawCounter, drawMoney, drawRabbits, drawHotbar, drawBench, drawOven,
    drawBg, drawFallbackBg, hintText, fillRoundRect, strokeRoundRect, benchUpgradeToggle,
-   stockingUI, stockingOpen, benchUpgradeUI, slotUpgradeButtons, signDimAlpha, signRect */
+   stockingUI, stockingOpen, benchUpgradeUI, slotUpgradeButtons, signDimAlpha, signRect, game,
+   rabbitOpen, interactOpen, TOY_REWARDS */
 
 const menuState = {
   buttons: [],
@@ -20,6 +21,15 @@ const menuState = {
 
 function goShop() {
   scenes.goto('shop', { fresh: true });
+}
+
+/* 当天还没打完就退回开始界面(Esc/翻牌) -> 可以接着打, 不用重新备货 */
+function dayInProgress() {
+  return !!(run.slots && run.slots.length) && (run.dayTimeLeft || 0) > 0 && !game.dayEnd;
+}
+/* 继续营业: 不重开当天(客人/耐心/托盘/倒计时都保留) */
+function resumeDay() {
+  scenes.goto('shop'); // 不带 fresh -> 不调 startDay
 }
 
 /* 翻牌子 -> 备货窗; 确认后开门, 取消则翻回休息面 */
@@ -64,13 +74,16 @@ scenes.register(
       menuState.sign = { phase: 0, target: 0 };
       menuDisplayInit();
 
-      const bw = 176;
+      /* 四个按钮在底栏里居中排开(互动入口挪到顶栏金币旁边了) */
+      const bw = 200;
       const bh = 56;
       const by = LAYOUT.bottomY + (LAYOUT.bottomH - bh) / 2;
-      const gap = 12;
-      const x0 = W - 20 - (bw * 4 + gap * 3);
+      const gap = 16;
+      const barX = LAYOUT.bench.x;
+      const barW = W - 16 - barX;
+      const x0 = barX + (barW - (bw * 4 + gap * 3)) / 2;
       menuState.buttons = [
-        { id: 'bench', x: x0, y: by, w: bw, h: bh, label: '制作台', size: 17, accent: COLORS.gold },
+        { id: 'rabbit', x: x0, y: by, w: bw, h: bh, label: '月兔', size: 17, accent: COLORS.ok },
         { id: 'factory', x: x0 + (bw + gap), y: by, w: bw, h: bh, label: '后厂', size: 17, accent: COLORS.ok },
         { id: 'rank', x: x0 + (bw + gap) * 2, y: by, w: bw, h: bh, label: '排行榜', size: 17, accent: COLORS.warn },
         { id: 'reset', x: x0 + (bw + gap) * 3, y: by, w: bw, h: bh, label: '重新开始', size: 17, accent: COLORS.textDim },
@@ -81,18 +94,18 @@ scenes.register(
       const sgn = menuState.sign;
       if (sgn.phase < sgn.target) {
         sgn.phase = Math.min(sgn.target, sgn.phase + dt * 2.2);
-        /* 翻到「营业中」-> 弹备货窗, 确认后才真正开门 */
-        if (sgn.phase >= 1 && sgn.target === 1 && !stockingUI.open) openStocking();
+        /* 翻到「营业中」: 当天打了一半就接着打, 否则弹备货窗(确认后才开门) */
+        if (sgn.phase >= 1 && sgn.target === 1 && !stockingUI.open) {
+          if (dayInProgress()) resumeDay();
+          else openStocking();
+        }
       } else if (sgn.phase > sgn.target) {
         sgn.phase = Math.max(sgn.target, sgn.phase - dt * 2.2);
       }
     },
 
     onDown(x, y) {
-      if (x > 280 && x < 700 && y > LAYOUT.bottomY + 104 && y < LAYOUT.bottomY + 138) {
-        Toy.openVideo();
-        return;
-      }
+      /* (顶栏互动按钮由全局挂件层处理, 见 state.js 的指针分发) */
       /* 翻牌子 */
       if (pointInRect(x, y, signRect()) && menuState.sign.phase !== 1) {
         menuState.sign.target = menuState.sign.target === 1 ? 0 : 1;
@@ -123,10 +136,7 @@ scenes.register(
       menuState.active = null;
       for (const btn of menuState.buttons) btn.pressed = false;
       if (!b || !pointInRect(x, y, b)) return;
-      if (b.id === 'bench') {
-        benchUpgradeUI.focus = null;
-        benchUpgradeToggle(true);
-      }
+      if (b.id === 'rabbit') rabbitOpen();
       else if (b.id === 'factory') scenes.goto('factory');
       else if (b.id === 'rank') scenes.goto('rank');
       else if (b.id === 'reset') {
@@ -144,18 +154,12 @@ scenes.register(
       drawFlipSign(ctx); // 牌子挂在柜台后面(会被柜台挡住下半截)
       drawCounter(ctx);
       drawMoney(ctx);
-      drawCart(ctx);
       drawHotbar(ctx);
       drawBench(ctx);
       drawOven(ctx);
 
       /* 底部栏(与左侧快捷栏齐底) */
       uiPanel(ctx, LAYOUT.bench.x, LAYOUT.bottomY, W - LAYOUT.bench.x - 16, LAYOUT.bottomH, { r: 14 });
-      drawText(ctx, '翻牌子开门营业 →', LAYOUT.bench.x + 28, LAYOUT.bottomY + 44, {
-        size: 17, color: COLORS.textDim, maxWidth: 210,
-      });
-      drawText(ctx, '第 ' + shop.day + ' 天　金币 ' + formatNum(shop.coins) + '　口碑 ' + shop.reputation,
-        LAYOUT.bench.x + 28, LAYOUT.bottomY + 88, { size: 15, color: COLORS.panelInk, maxWidth: 210 });
 
       for (const b of menuState.buttons) uiButton(ctx, b);
 
@@ -163,15 +167,10 @@ scenes.register(
       menuState.slotButtons = slotUpgradeButtons();
       for (const b of menuState.slotButtons) uiButton(ctx, b);
 
-      uiHeader(ctx, { title: '月饼工坊 · 开始营业' });
+      /* 月兔不在这里画: 闭店蒙板是 main.js 在场景之后盖的,
+       * 画在场景里会被蒙板沿柜台切成两半(见 main.js 的 drawClosedOverlay 之后) */
 
-      /* 作者/视频入口 + 互动解锁状态(贴栏底) */
-      drawText(ctx, '作者：' + getAuthorName() + '  ·  点击打开视频', LAYOUT.bench.x + 28, LAYOUT.bottomY + 120, {
-        size: 13, color: COLORS.textDim,
-      });
-      const un = '互动解锁：赞' + (interact.liked ? '✔' : '✘') + ' 币' + (interact.coin ? '✔' : '✘')
-        + ' 藏' + (interact.fav ? '✔' : '✘') + ' 关注' + (interact.following ? '✔' : '✘');
-      drawText(ctx, un, W - 28, LAYOUT.bottomY + 120, { size: 13, align: 'right', color: COLORS.textDim });
+      uiHeader(ctx, { title: '月饼工坊 · 开始营业' });
     },
   }),
 );
@@ -213,16 +212,13 @@ function drawFlipSign(g) {
   g.restore();
   strokeRoundRect(g, r.x, r.y, r.w, r.h, 16, open ? '#f3e3b4' : COLORS.panelBorder, 4);
 
+  /* 牌子上只留状态大字和图案(操作提示那两行小字去掉了) */
   if (open) {
-    drawText(g, '营业中', cx, r.y + 40, { size: 32, weight: 700, align: 'center', color: '#33230f' });
-    drawText(g, '第 ' + shop.day + ' 天 · 开门！', cx, r.y + 74, { size: 12, weight: 600, align: 'center', color: '#50391c' });
-    drawText(g, '🥮', cx, r.y + 102, { size: 20, align: 'center' });
+    drawText(g, '营业中', cx, r.y + 52, { size: 32, weight: 700, align: 'center', color: '#33230f' });
+    drawText(g, '🥮', cx, r.y + 100, { size: 20, align: 'center' });
   } else {
-    drawText(g, '今日休息', cx, r.y + 40, { size: 29, weight: 700, align: 'center', color: COLORS.panelTitle });
-    drawText(g, '点击翻牌子 · 开门营业', cx, r.y + 74, {
-      size: 12, weight: 600, align: 'center', color: COLORS.textDim,
-    });
-    drawText(g, '🌙', cx, r.y + 102, { size: 19, align: 'center' });
+    drawText(g, '今日休息', cx, r.y + 52, { size: 29, weight: 700, align: 'center', color: COLORS.panelTitle });
+    drawText(g, '🌙', cx, r.y + 100, { size: 19, align: 'center' });
   }
   /* 闭店蒙板: 画在「翻转变换」里, 所以牌子翻动时它跟着一起缩放(不会留在原地) */
   const dim = signDimAlpha(open);

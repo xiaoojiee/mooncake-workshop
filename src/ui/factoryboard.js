@@ -158,13 +158,22 @@ function factoryBoardUpdate(dt) {
   }
 }
 
+/* 指针附近有没有掉落产物(判断「这一下是要捡东西」) */
+function fbDropsNear(x, y, radius) {
+  const r = radius || 60;
+  for (const d of factoryBoardDrops) {
+    if (dist(x, y, d.x, d.y) <= r) return true;
+  }
+  return false;
+}
+
 /* 按住的指针扫过就收: 返回收集数量 */
-function factoryBoardSweep(x, y) {
-  const radius = 34;
+function factoryBoardSweep(x, y, radius) {
+  const rad = radius || 34;
   let n = 0;
   for (let i = factoryBoardDrops.length - 1; i >= 0; i--) {
     const d = factoryBoardDrops[i];
-    if (dist(x, y, d.x, d.y) > radius) continue;
+    if (dist(x, y, d.x, d.y) > rad) continue;
     if (collectDrop(d.uid)) {
       factoryBoardDrops.splice(i, 1);
       n += 1;
@@ -270,8 +279,8 @@ function factoryBoardDown(x, y) {
   if (x >= FB.leftX && x <= FB.leftX + FB.leftW && y >= FB.top + 60 && y <= FB.bottom) {
     return fbWarehouseDown(x, y);
   }
-  /* 按住碰到掉落产物 → 收进背包 */
-  if (factoryBoardSweep(x, y) > 0) return;
+  /* 按住碰到掉落产物 → 收进背包(判定放宽到 48, 产物躺在格子底边, 手抖也能捡到) */
+  if (factoryBoardSweep(x, y, 48) > 0) return;
   /* 网格 */
   const cell = fbCellAt(x, y);
   if (cell >= 0) {
@@ -282,7 +291,10 @@ function factoryBoardDown(x, y) {
     const u = unitAtCell(cell);
     if (u) {
       factoryBoard.selected = u.uid;
-      factoryBoard.pending = { kind: 'unit', uid: u.uid, x, y };
+      /* 这格还有产物可捡时, 按下只捡不拖 —— 否则想捡东西会顺手把工厂拖走 */
+      const picking = u.drops > 0 || fbDropsNear(x, y, 64);
+      if (!picking) factoryBoard.pending = { kind: 'unit', uid: u.uid, x, y };
+      else factoryBoard.pending = null;
     }
     return;
   }
@@ -390,7 +402,8 @@ function factoryBoardMove(x, y) {
   }
   if (factoryBoard.pending) {
     const p = factoryBoard.pending;
-    if (dist(x, y, p.x, p.y) > 12) {
+    /* 阈值给宽一点: 手抖不算拖拽 */
+    if (dist(x, y, p.x, p.y) > 20) {
       if (p.kind === 'slotComp') {
         removeComponent(p.uid, p.slotIndex);
         factoryBoard.drag = { kind: 'detachedComp', compId: p.compId, x, y };
@@ -588,7 +601,7 @@ function drawWarehouseFactories(g) {
   const ids = warehouseFactoryIds();
   factoryBoard.maxScroll.warehouse = Math.max(0, ids.length * 52 - (FB.bottom - FB.top - 80));
   if (!ids.length) {
-    drawText(g, '（空）去下面「商店」买工厂卡', FB.leftX + 16, FB.top + 110, { size: 14, color: COLORS.textDim });
+    drawText(g, '空', FB.leftX + 16, FB.top + 110, { size: 14, color: COLORS.textDim });
   }
   ids.forEach((fid, i) => {
     const def = findFactoryDef(fid);
@@ -601,7 +614,7 @@ function drawWarehouseFactories(g) {
     drawCard(g, r.x, r.y, r.w, r.h, 9, false);
     drawProductDot(g, r.x + 20, r.y + 23, def);
     drawText(g, def ? def.name : fid, r.x + 36, r.y + 16, { size: 15, weight: 600, color: COLORS.panelInk, maxWidth: r.w - 90 });
-    drawText(g, '仓库 x' + shop.factoryBag[fid] + ' · 拖到网格上场', r.x + 36, r.y + 34, {
+    drawText(g, '仓库 x' + shop.factoryBag[fid], r.x + 36, r.y + 34, {
       size: 12, color: COLORS.textDim,
     });
     fillRoundRect(g, sr.x, sr.y, sr.w, sr.h, 5, 'rgba(190,105,96,0.85)');
@@ -614,7 +627,7 @@ function drawWarehouseComponents(g) {
   const ids = warehouseCompIds();
   factoryBoard.maxScroll.warehouse = Math.max(0, ids.length * 52 - (FB.bottom - FB.top - 80));
   if (!ids.length) {
-    drawText(g, '（空）等特殊客人掉落或商店购买', FB.leftX + 16, FB.top + 110, { size: 14, color: COLORS.textDim });
+    drawText(g, '空 · 等特殊客人掉落或商店购买', FB.leftX + 16, FB.top + 110, { size: 14, color: COLORS.textDim });
   }
   ids.forEach((cid, i) => {
     const cd = findComponentDef(cid);
@@ -791,7 +804,7 @@ function drawRightDetail(g) {
     drawText(g, '速度 ' + u.speed.toFixed(1) + '/s　品质 ' + u.quality.toFixed(1) + '　待捡 ' + u.drops,
       FB.rightX + 16, FB.top + 54, { size: 13, color: COLORS.textDim });
 
-    drawText(g, '槽位（从左边组件仓库拖入 · 点已装升级/卸下）', FB.rightX + 16, FB.top + 148, {
+    drawText(g, '槽位', FB.rightX + 16, FB.top + 148, {
       size: 12, weight: 600, color: COLORS.textDim,
     });
     u.slots.forEach((slot, i) => {
@@ -912,8 +925,8 @@ function drawShopModal(g) {
 
     if (isFactory) {
       const kindLabel = def.kind === 'crust' ? '饼皮工厂'
-        : def.kind === 'util' ? '自动设施（吸相邻4格）'
-          : def.kind === 'hardware' ? '道具工厂（产五金月饼）' : '馅料工厂';
+        : def.kind === 'util' ? '自动设施'
+          : def.kind === 'hardware' ? '道具工厂' : '馅料工厂';
       const iconKey = def.kind === 'crust' ? 'factory_crust' : def.kind === 'filling' ? 'factory_filling' : null;
       if (iconKey && img(iconKey)) {
         drawSprite(g, iconKey, r.x + 10, r.y + 16, 56, 56);
@@ -934,7 +947,7 @@ function drawShopModal(g) {
     drawText(g, '💰' + cost, r.x + r.w - 14, r.y + r.h - 18, {
       size: 17, weight: 700, align: 'right', color: afford ? COLORS.gold : COLORS.fail,
     });
-    drawText(g, afford ? '点击购买' : '金币不足', r.x + 14, r.y + r.h - 18, {
+    drawText(g, afford ? '购买' : '金币不足', r.x + 14, r.y + r.h - 18, {
       size: 11, color: afford ? COLORS.textDim : COLORS.fail,
     });
     factoryBoard.buttons.push({ id: 'buyShopCell', value: def.id, x: r.x, y: r.y, w: r.w, h: r.h, disabled: !afford });

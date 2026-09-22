@@ -23,7 +23,9 @@
    OVEN, ASSEMBLY, COUNTER, COUNTER_LABEL, CORE, PRODUCE, createOvenSlot, createSlot,
    addFloater, SFX, saveGame, findComponentDef, findFactoryDef, isComponentAllowed,
    componentRestrictLabel, computeFactoryStats, slotCost, componentUpgradeCost, MAX_SLOTS,
-   CRUSTS, FILLINGS, START_MATERIAL_EACH, QUALITY */
+   CRUSTS, FILLINGS, START_MATERIAL_EACH, QUALITY,
+   showScreenText, pick, factoryName ,
+   COMPONENT_TYPES */
 
 /* ---- 5×5 网格 ---- */
 const GRID = { size: 5, core: 12 };
@@ -118,24 +120,51 @@ function normalizeSlots(slots) {
 function applyFactorySave(saved) {
   if (!saved) return;
   if (saved.units && !Array.isArray(saved.units)) {
-    shop.units = {};
-    shop.nextUnitId = saved.nextUnitId || 1;
+    /* 先读到临时表: 存档里一个有效工厂都没有时(云存档写失败/旧档/字段被截断)
+     * 不要清空地图, 保留 initFactories 刚建好的初始工厂 */
+    const restored = {};
+    let nextId = saved.nextUnitId || 1;
     for (const uid in saved.units) {
       const s = saved.units[uid];
-      if (!s || !findFactoryDef(s.factoryId) || !cellInGrid(s.cell) || isCoreCell(s.cell)) continue;
-      shop.units[uid] = {
+      /* 兼容两种存档: 老的(factoryId/cell/slots/{compId,level}) 与紧凑的(f/c/s/[[下标,等级]]) */
+      const factoryId = s && s.factoryId != null ? s.factoryId
+        : (s && typeof s.f === 'string' ? s.f
+          : (s && typeof s.f === 'number' && typeof FACTORIES !== 'undefined' && FACTORIES[s.f] ? FACTORIES[s.f].id : null));
+      /* 格子: 一直是「网格下标(数字)」; 兼容早期写成 {x,y} 的情况 */
+      let cell = s && s.cell != null ? s.cell : (s ? s.c : null);
+      if (cell && typeof cell === 'object' && typeof GRID !== 'undefined') cell = cell.y * GRID.size + cell.x;
+      if (!s || !findFactoryDef(factoryId) || !cellInGrid(cell) || isCoreCell(cell)) continue;
+      /* 槽位: 兼容三种写法
+       *   {compId, level}            最早
+       *   [组件下标, 等级] 或 0       中间版
+       *   数字(下标*8+等级) 或 0      当前(最省字节) */
+      const rawSlots = s.slots != null ? s.slots
+        : (Array.isArray(s.s)
+          ? s.s.map((v) => {
+            if (Array.isArray(v)) return { compId: (typeof COMPONENT_TYPES !== 'undefined' && COMPONENT_TYPES[v[0]] ? COMPONENT_TYPES[v[0]].id : null), level: v[1] };
+            if (typeof v === 'string') return { compId: v, level: 1 };
+            const n = v | 0;
+            if (!n) return null;
+            const cd = typeof COMPONENT_TYPES !== 'undefined' ? COMPONENT_TYPES[(n - 1) >> 3] : null;
+            return cd ? { compId: cd.id, level: ((n - 1) & 7) + 1 } : null;
+          })
+          : null);
+      restored[uid] = {
         uid,
-        factoryId: s.factoryId,
-        cell: s.cell,
-        slots: normalizeSlots(s.slots),
-        progress: s.progress != null ? s.progress : 0,
-        drops: s.drops != null ? s.drops : 0,
-        capacity: s.capacity != null ? s.capacity : 0,
-        quality: s.quality != null ? s.quality : 1,
-        speed: s.speed != null ? s.speed : 0,
+        factoryId,
+        cell,
+        slots: normalizeSlots(rawSlots),
+        progress: s.progress != null ? s.progress : (s.p != null ? s.p : 0),
+        drops: s.drops != null ? s.drops : (s.d != null ? s.d : 0),
       };
       const n = parseInt(String(uid).replace(/^u/, ''), 10);
-      if (Number.isFinite(n) && n >= shop.nextUnitId) shop.nextUnitId = n + 1;
+      if (Number.isFinite(n) && n >= nextId) nextId = n + 1;
+    }
+    if (Object.keys(restored).length) {
+      shop.units = restored;
+      shop.nextUnitId = nextId;
+    } else if (typeof console !== 'undefined') {
+      console.warn('[save] 存档里没有有效工厂, 保留初始工厂');
     }
   }
   if (saved.bag) shop.factoryBag = saved.bag;
@@ -209,7 +238,8 @@ function refreshUnit(uid) {
   const stats = computeFactoryStats(def, u);
   u.speed = stats.finalSpeed;
   u.quality = stats.quality;
-  u.capacity = Math.round(def.baseCapacity * (1 + (u.slots.length - 1) * 0.3));
+  /* 容量: 槽位越多越大, 搅拌桨这类「产能」组件再往上加 */
+  u.capacity = Math.round(def.baseCapacity * (1 + (u.slots.length - 1) * 0.3 + (stats.yieldBonus || 0)));
 }
 
 function refreshAllFactories() {
@@ -233,7 +263,7 @@ function applyCoreUpgrade() {
   if (shop.coins < cost) return { ok: false, reason: '金币不足' };
   shop.coins -= cost;
   shop.coreLevel = coreLevel() + 1;
-  addFloater('能源核心 Lv.' + shop.coreLevel + ' (+' + coreCapacity() + '电)', 1100, 340, COLORS.ok, 1.5);
+  addFloater('能源核心 Lv.' + shop.coreLevel + ' · 总电量 ' + coreCapacity(), 1100, 340, COLORS.ok, 1.5);
   SFX.unlock();
   saveGame();
   return { ok: true, level: shop.coreLevel, cost };
@@ -591,6 +621,51 @@ function backpackTake(kind, productId, n) {
   return true;
 }
 
+/* 史蒂夫客人的谢礼: 随机白送一项升级(工厂槽位/制作台/烤炉/锅炉/能源核心; 月兔除外) */
+function freeUpgradeGift() {
+  if (!shop.counter) shop.counter = { boiler: 0, tray: 0 };
+  const cands = [];
+  if (counterLevel('tray') < COUNTER.tray.max) cands.push({ kind: 'tray' });
+  if (counterLevel('boiler') < COUNTER.boiler.max) cands.push({ kind: 'boiler' });
+  if ((shop.ovenLevel || 1) < OVEN.maxSlots) cands.push({ kind: 'oven' });
+  if (coreLevel() < CORE.maxLevel) cands.push({ kind: 'core' });
+  for (const uid in shop.units || {}) {
+    const u = shop.units[uid];
+    if (u && u.slots.length < MAX_SLOTS) cands.push({ kind: 'slot', uid: uid });
+  }
+  if (!cands.length) {
+    showScreenText('史蒂夫的谢礼', '能升的都满了', COLORS.textDim);
+    return false;
+  }
+  const p = pick(cands);
+  let label = '';
+  if (p.kind === 'tray') {
+    shop.counter.tray = counterLevel('tray') + 1;
+    while (run.slots && run.slots.length < benchSlotCount()) run.slots.push(createSlot());
+    label = '制作台 +1 托盘';
+  } else if (p.kind === 'boiler') {
+    shop.counter.boiler = counterLevel('boiler') + 1;
+    label = '锅炉 Lv.' + shop.counter.boiler;
+  } else if (p.kind === 'oven') {
+    shop.ovenLevel = (shop.ovenLevel || 1) + 1;
+    run.oven.push(createOvenSlot());
+    label = '烤炉 +1 烤位';
+  } else if (p.kind === 'core') {
+    shop.coreLevel = coreLevel() + 1;
+    label = '能源核心 Lv.' + shop.coreLevel;
+  } else if (p.kind === 'slot') {
+    const u = shop.units[p.uid];
+    u.slots.push(null);
+    refreshUnit(p.uid);
+    label = (typeof factoryName === 'function' ? factoryName(u.factoryId) : '工厂') + ' 新槽位';
+  }
+  showScreenText('史蒂夫的谢礼', label + ' · 免费', COLORS.ok);
+  addFloater(label + ' 免费!', 1100, 340, COLORS.ok, 1.5);
+  SFX.unlock();
+  saveGame();
+  return true;
+}
+
 /* ---- 烤位升级 ---- */
 function upgradesFor(factoryId) {
   return UPGRADES.filter((u) => u.factoryId === factoryId);
@@ -633,7 +708,7 @@ function applyCounterUpgrade(track) {
   if (shop.coins < cost) return { ok: false, reason: '金币不足' };
 
   shop.coins -= cost;
-  if (!shop.counter) shop.counter = { boiler: 0, tray: 0, cart: 0 };
+  if (!shop.counter) shop.counter = { boiler: 0, tray: 0 };
   shop.counter[track] = lv + 1;
 
   if (track === 'tray') {
@@ -651,40 +726,10 @@ function benchSlotCount() {
 }
 
 function ovenBakeTime() {
-  return OVEN.bakeTime * Math.max(0.5, 1 - COUNTER.boiler.bakeFactor * counterLevel('boiler'));
+  return OVEN.bakeTime * Math.max(0.35, 1 - COUNTER.boiler.bakeFactor * counterLevel('boiler'));
 }
 function ovenBurnTime() {
   return OVEN.burnTime * (1 + COUNTER.boiler.burnFactor * counterLevel('boiler'));
-}
-
-/* ---- 制作台自动化(按槽位, 分级) ---- */
-function slotAutoLevel(index) {
-  return (shop.autoSlots && shop.autoSlots[index]) || 0;
-}
-function slotAutoEnabled(index) {
-  return slotAutoLevel(index) > 0;
-}
-/* 下一级花费; 满级返回 null */
-function slotAutoCost(index) {
-  const lv = slotAutoLevel(index);
-  return lv >= COUNTER.auto.max ? null : COUNTER.auto.cost[lv];
-}
-/* 升级该制作台的自动装配速度(第 1 级即开启自动化) */
-function upgradeSlotAuto(index) {
-  if (!run.slots || !run.slots[index]) return { ok: false, reason: '没有这个制作台' };
-  const lv = slotAutoLevel(index);
-  if (lv >= COUNTER.auto.max) return { ok: false, reason: '已满级' };
-  const cost = COUNTER.auto.cost[lv];
-  if (shop.coins < cost) return { ok: false, reason: '金币不足' };
-  shop.coins -= cost;
-  if (!shop.autoSlots) shop.autoSlots = [];
-  shop.autoSlots[index] = lv + 1;
-  run.slots[index].auto = true;
-  run.slots[index].autoLevel = lv + 1;
-  addFloater('自动装配 Lv.' + (lv + 1), 700, 360, COLORS.ok, 1.4);
-  SFX.unlock();
-  saveGame();
-  return { ok: true, level: lv + 1, cost };
 }
 
 /* 背包是否够做某个订单 */

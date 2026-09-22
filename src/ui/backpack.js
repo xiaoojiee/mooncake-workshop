@@ -193,7 +193,7 @@ function backpackTryDrop(drag, x, y) {
 function drawBackpackButton(g) {
   const r = backpackButtonRect();
   uiButton(g, Object.assign({
-    id: 'backpack', label: '🎒 背包', size: 17,
+    id: 'backpack', label: '背包', size: 17,
     accent: backpackUI.open ? COLORS.ok : COLORS.gold,
   }, r));
 }
@@ -206,7 +206,7 @@ function drawBackpackWindow(g) {
   g.restore();
 
   uiPanel(g, p.x, p.y, p.w, p.h, { r: 16, color: COLORS.panelDark });
-  drawText(g, '背包（拖动产物到制作台 · 滚轮滚动 · 再点左上角按钮关闭）', p.x + 18, p.y + 20, {
+  drawText(g, '背包', p.x + 18, p.y + 20, {
     size: 16, weight: 700, color: COLORS.panelTitle,
   });
 
@@ -219,7 +219,7 @@ function drawBackpackWindow(g) {
 
   const items = backpackCellRects();
   if (!items.length) {
-    drawText(g, '背包是空的：去工厂面板收集产物', p.x + 18, p.y + 70, { size: 15, color: COLORS.textDim });
+    drawText(g, '背包是空的', p.x + 18, p.y + 70, { size: 15, color: COLORS.textDim });
   }
   for (const it of items) {
     const r = it.rect;

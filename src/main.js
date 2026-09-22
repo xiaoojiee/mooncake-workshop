@@ -4,8 +4,11 @@
 
 /* global scenes, clock, input, updateFactories, updateFloaters, drawFloaters, saveGameThrottled,
    screenMsg, floaters, shake, ctx, W, H, COLORS, setFont, drawText, initInput, VW, VH,
+   updateCoinFly, drawCoinFly, updateCrumbs, drawCrumbs,
    drawBackpackButton, drawBackpackWindow, backpackUI, drawBenchUpgradeWindow, benchUpgradeUI,
-   drawStockingWindow, stockingUI, drawDebugButton, drawClosedOverlay, hudChromeVisible */
+   drawStockingWindow, stockingUI, drawDebugButton, drawClosedOverlay, hudChromeVisible,
+   drawRabbitWindow, rabbitUI, drawRabbits, run,
+   interactUpdate, drawInteractWindow, interactUI , drawInteractButton */
 
 let lastTime = 0;
 let rafId = 0;
@@ -25,6 +28,9 @@ function step(now) {
   /* 逻辑更新 */
   updateFactories(dt);
   updateFloaters(dt);
+  updateCoinFly(dt);
+  if (typeof interactUpdate === 'function') interactUpdate(dt);
+  updateCrumbs(dt);
   scenes.update(dt);
   saveGameThrottled(dt);
 
@@ -55,16 +61,24 @@ function step(now) {
    * 必须画在浮窗之前, 否则「今日菜单」「背包」等弹窗会被一起蒙掉 */
   drawClosedOverlay(ctx);
 
+  /* 月兔画在闭店蒙板之上: 蒙板上沿正好压在柜台上, 画在下面会被切成两半 */
+  if (run.scene === 'menu' && typeof drawRabbits === 'function') drawRabbits(ctx);
+
   /* 全局背包(进入游戏后可用; 启动/加载页不显示) —— 画在蒙板之上, 保持明亮可读 */
   if (hudChromeVisible()) {
     drawBackpackButton(ctx);
+    if (typeof drawInteractButton === 'function') drawInteractButton(ctx);
     drawDebugButton(ctx);
     if (backpackUI.open) drawBackpackWindow(ctx);
     if (stockingUI.open) drawStockingWindow(ctx);
+    if (rabbitUI.open) drawRabbitWindow(ctx);
+    if (interactUI.open) drawInteractWindow(ctx);
     if (benchUpgradeUI.open) drawBenchUpgradeWindow(ctx);
   }
 
   drawFloaters(ctx);
+  drawCoinFly(ctx);
+  drawCrumbs(ctx);
   drawScreenMsg();
 
   input.pointer.downPrev = input.pointer.down;

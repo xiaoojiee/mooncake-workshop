@@ -8,8 +8,7 @@
  *
  * 图集规格(与美术交付一致):
  *   crust_sheet.png   3 行 x 4 列   行: 生面团 / 包好成品 / 摊开饼皮 ; 列: 饼皮种类
- *   filling_a.png     2 行 x 2 列   五仁 / 莲蓉 / 豆沙 / 蛋黄
- *   filling_b.png     2 行 x 2 列   西瓜 / 螺丝 / 砖头 / 腐肉
+ *   filling_sheet.png 3 行 x 3 列(中间格空)  五仁/莲蓉/豆沙 蛋黄/-/西瓜 螺丝/砖头/腐肉
  *   npc.png           2 行(第一排3人, 第二排2人) 5 个客人
  */
 
@@ -120,9 +119,38 @@ function drawCrustPart(g, col, rowName, x, y, w, h) {
   return drawAtlas(g, 'crust_sheet', col, CRUST_ROW[rowName] || 0, CRUST_COLS, CRUST_ROWS, cx - nw / 2, cy - nh / 2, nw, nh);
 }
 
-/* 馅料图集: index 0..3 -> filling_a, 4..7 -> filling_b */
+/* 馅料图标: 加载时已按 assets.js 的 boxes 切成 filling_0..7(紧贴内容)
+ * 顺序不变: 0五仁 1莲蓉 2豆沙 3蛋黄 4西瓜 5螺丝 6砖头 7腐肉
+ * 缩放: 8 个图标共用「同一个比例」(size / 最大那张的尺寸),
+ *       不做逐张归一化 —— 这样美术画的相对大小能保留 */
+const FILLING_SCALE = 0.5; // 馅料整体缩到一半(和美术给的相对大小一起用)
+let fillingRefSize = 0;
+function fillingRef() {
+  if (fillingRefSize > 0) return fillingRefSize;
+  let m = 0;
+  for (let i = 0; i < 8; i++) {
+    const im = img('filling_' + i);
+    if (!im) continue;
+    m = Math.max(m, im.naturalWidth || im.width, im.naturalHeight || im.height);
+  }
+  if (m > 0) fillingRefSize = m; // 素材没加载好就先不缓存
+  return m || 1;
+}
+
 function drawFillingIcon(g, index, cx, cy, size) {
+  const i = ((index % 8) + 8) % 8;
+  const image = img('filling_' + i);
+  if (image) {
+    const iw = image.naturalWidth || image.width;
+    const ih = image.naturalHeight || image.height;
+    const k = (size / fillingRef()) * FILLING_SCALE; // 统一比例 + 整体缩小
+    const w = iw * k;
+    const h = ih * k;
+    g.drawImage(image, 0, 0, iw, ih, cx - w / 2, cy - h / 2, w, h);
+    return true;
+  }
+  /* 兜底: 旧的 filling_a / filling_b 两张 2×2 图集 */
   const key = index < 4 ? 'filling_a' : 'filling_b';
-  const i = index < 4 ? index : index - 4;
-  return drawAtlasFit(g, key, i % 2, Math.floor(i / 2), 2, 2, cx, cy, size);
+  const j = index < 4 ? index : index - 4;
+  return drawAtlasFit(g, key, j % 2, Math.floor(j / 2), 2, 2, cx, cy, size);
 }

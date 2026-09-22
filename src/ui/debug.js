@@ -8,7 +8,8 @@
 /* global COLORS, shop, run, uiButton, pointInRect, drawText, SFX, showScreenText,
    CUSTOMERS, makeCustomer */
 
-const DEBUG = { on: true, amount: 1000 };
+/* ⚠️ 发布版: 关掉调试按钮/键盘测试键(想自测就临时改成 true) */
+const DEBUG = { on: false, amount: 1000 };
 
 /* 键盘提示(画在按钮下方) */
 const DEBUG_HINT = '+:金币  1-5:特殊客  0:打烊';

@@ -161,6 +161,15 @@ function uiBar(g, x, y, w, h, ratio, color, bg) {
   if (r > 0) fillRoundRect(g, x, y, Math.max(h, w * r), h, h / 2, color || COLORS.gold);
 }
 
+/* 顶栏金币图标的中心点: uiHeader 画图标、拾取金币的飞入动画都用它, 保证对得上 */
+function coinIconPos(g) {
+  const numStr = formatNum(shop.coins);
+  setFont(g, 24, 700);
+  const numW = g.measureText(numStr).width;
+  const numRight = (W - 28) - 132;
+  return { x: Math.max(430, numRight - numW - 42) + 17, y: LAYOUT.headerH / 2, numW: numW };
+}
+
 /* 顶部状态栏(天数/金币/口碑/静音) */
 function uiHeader(g, opts) {
   const o = opts || {};
@@ -187,13 +196,12 @@ function uiHeader(g, opts) {
    * 这样位数再多也不会顶到右边的「第N天 / 口碑」 */
   const rx = W - 28;
   const numStr = formatNum(shop.coins);
-  setFont(g, 24, 700);
-  const numW = g.measureText(numStr).width;
-  const numRight = rx - 132;
-  drawText(g, numStr, numRight, LAYOUT.headerH / 2, {
+  const ip = coinIconPos(g); // 图标中心(拾取金币的飞入落点)
+  drawText(g, numStr, rx - 132, LAYOUT.headerH / 2, {
     size: 24, weight: 700, align: 'right', color: COLORS.cream, stroke: '#a35c12', strokeWidth: 3.5,
   });
-  drawSprite(g, 'ui_coin', Math.max(430, numRight - numW - 42), LAYOUT.headerH / 2 - 17, 34, 34);
+  drawSprite(g, 'ui_coin', ip.x - 17, ip.y - 17, 34, 34);
+  /* (互动入口不在顶栏里画: 它和全局背包按钮同一层, 见 main.js 的挂件区) */
   drawText(g, '第 ' + shop.day + ' 天', rx - 20, LAYOUT.headerH / 2 - 12, {
     size: 18,
     weight: 700,
@@ -202,7 +210,7 @@ function uiHeader(g, opts) {
     stroke: COLORS.btnInk,
     strokeWidth: 3,
   });
-  drawText(g, '口碑 ' + shop.reputation, rx - 20, LAYOUT.headerH / 2 + 14, {
+  drawText(g, ratingHeaderText(), rx - 20, LAYOUT.headerH / 2 + 14, {
     size: 14,
     weight: 600,
     align: 'right',

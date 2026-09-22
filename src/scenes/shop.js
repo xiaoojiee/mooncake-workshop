@@ -30,13 +30,14 @@
    upgradeComponent, buyComponent, slotCost, MAX_SLOTS, unlockLabel,
    MONEY, COUNTER, COUNTER_LABEL, DAY, touching, rand, randInt, clamp, lerp, img, addFloater,
    benchSlotCount, moveComponent, ovenBakeTime, ovenBurnTime, counterLevel,
-   slotAutoLevel,
+   updateRabbits, rabbitOpen, RABBIT_ART_NPC, RABBIT, drawNpc, spawnCoinFly,
+   updateCat, drawCat, catActive, CAT, catKnockOut, catIsTamed,
    applyCounterUpgrade, counterUpgradeCost, isComponentAllowed, componentRestrictLabel,
    poweredUnitIds, isUnitPowered,
    factoryBoard, factoryBoardReset, factoryBoardDraw, factoryBoardDown, factoryBoardMove,
    factoryBoardUp, factoryBoardWheel, factoryBoardUpdate, factoryBoardSweep, input,
    benchUpgradeToggle, benchUpgradeUI, HARDWARE, findProductDef,
-drawSprite, strokeRoundRect */
+drawSprite, strokeRoundRect , shopRating, ratingSubmitValue, formatRating, RATING */
 
 const game = {
   buttons: [],
@@ -57,6 +58,7 @@ const game = {
   factorySel: null, // 工厂面板当前选中工厂
   pendingCompDrag: null, // 按住已装组件但还没拖动(区分点击/拖拽)
   ovenScroll: 0, // 烤位面板滚动偏移
+  ovenDrag: null, // 烤位面板触摸拖动(手机没有滚轮)
   hotbarScroll: 0, // 快捷栏滚动偏移
   hotbarPress: null, // 按住快捷栏条目但还没决定是滚动还是拖拽
   hotbarDrag: null, // 快捷栏滚动条/内容拖动
@@ -92,6 +94,8 @@ function compName(compId) {
 const DRAG = {
   CRUST: 'crust', FILLING: 'filling', SLOT: 'slot', OVEN: 'oven',
   PLATE: 'plate', // 柜台上已摆好的月饼
+  RABBIT: 'rabbit', // 月兔(可以拖着挪位置)
+  CAT: 'cat', // 流浪猫耄耋(可以拖着挪位置)
   COMPONENT: 'component',
 };
 
@@ -168,10 +172,18 @@ scenes.register(
 
       /* 柜台上的金币 */
       updateMoney(dt);
-      updateCart(dt);
 
-      /* 自动制作台 */
-      updateAutoBench(dt);
+      /* 安全网: 拖拽状态已经没了(松手事件丢了/拖到画布外), 就别让它们粘着鼠标不动了 */
+      if (!game.drag || game.drag.kind !== DRAG.RABBIT) {
+        for (const rb of shop.rabbits || []) if (rb.held) rb.held = false;
+      }
+      if ((!game.drag || game.drag.kind !== DRAG.CAT) && shop.cat && shop.cat.held) shop.cat.held = false;
+
+      /* 月兔: 溜达 + 安抚/收银/做月饼/入炉/送餐 */
+      updateRabbits(dt);
+
+      /* 流浪猫「耄耋」: 溜达 + 扑客人/偷吃 */
+      updateCat(dt);
 
       /* 烤炉进度 */
       for (const os of run.oven) {
@@ -237,6 +249,11 @@ scenes.register(
         run.factoryOpen = true;
         return;
       }
+      if (b && b.id === 'rabbit') {
+        SFX.click();
+        rabbitOpen();
+        return;
+      }
       if (b && b.id === 'bench') {
         SFX.click();
         benchUpgradeUI.focus = null;
@@ -274,11 +291,36 @@ scenes.register(
         return;
       }
 
-      /* 五金月饼已选中: 点客人 = 投出去砸飞(命中才结算) */
+      /* 烤位面板: 手机没有滚轮, 所以也能按住拖(滚动条 / 空白处)
+       * 注意: 按在「有月饼的烤位」上要留给拖拽取出, 不能吃掉 */
+      const ovThumb = ovenBarThumb();
+      if (ovThumb && pointInRect(x, y, { x: ovThumb.x - 8, y: ovThumb.y, w: ovThumb.w + 16, h: ovThumb.h })) {
+        game.ovenDrag = { mode: 'bar', grab: y - ovThumb.y };
+        return;
+      }
+      if (pointInRect(x, y, ovenPanelArea()) && ovenMaxScroll() > 0) {
+        let onMoon = false;
+        for (let i = 0; i < run.oven.length; i++) {
+          const os = run.oven[i];
+          if (!os || !os.moon) continue;
+          if (pointInRect(x, y, ovenRect(i))) { onMoon = true; break; }
+        }
+        if (!onMoon) {
+          game.ovenDrag = { mode: 'content', startY: y, startScroll: game.ovenScroll };
+          return;
+        }
+      }
+
+      /* 五金月饼已选中: 点客人 = 投出去砸飞(命中才结算); 点耄耋 = 打飞它 */
       if (game.smashItem) {
+        const from = game.smashFrom || { x: LAYOUT.backpack.x + 40, y: LAYOUT.backpack.y + 60 };
+        const catNow = shop.cat;
+        if (catNow && !catNow.gone && !catNow.flung &&
+            Math.abs(x - catNow.x) <= 56 && Math.abs(y - catNow.y) <= 72) {
+          if (throwHardware(null, from.x, from.y, catNow.x, catNow.y)) return;
+        }
         const victim = pickCustomerAt(x, y);
         if (victim) {
-          const from = game.smashFrom || { x: LAYOUT.backpack.x + 40, y: LAYOUT.backpack.y + 60 };
           throwHardware(victim, from.x, from.y, x, y);
           return;
         }
@@ -304,6 +346,20 @@ scenes.register(
       }
       /* 按住扫过金币就收 */
       if (input.pointer.down) collectMoneyAround(x, y);
+
+      /* 烤位滚动(触摸拖动) */
+      if (game.ovenDrag) {
+        const oa = ovenPanelArea();
+        if (game.ovenDrag.mode === 'bar') {
+          const thumbH = Math.max(28, oa.h * (oa.h / ovenContentH()));
+          const t = clamp((y - game.ovenDrag.grab - oa.y) / Math.max(1, oa.h - thumbH), 0, 1);
+          game.ovenScroll = t * ovenMaxScroll();
+        } else {
+          game.ovenScroll = game.ovenDrag.startScroll - (y - game.ovenDrag.startY);
+        }
+        clampOvenScroll();
+        return;
+      }
 
       /* 快捷栏滚动 */
       if (game.hotbarDrag) {
@@ -352,6 +408,21 @@ scenes.register(
       if (game.drag) {
         game.drag.x = x;
         game.drag.y = y;
+        /* 拖月兔时让它跟手 */
+        if (game.drag.kind === DRAG.RABBIT) {
+          const rb = (shop.rabbits || [])[game.drag.index];
+          if (rb) {
+            rb.held = true;
+            rb.x = clamp(x, RABBIT.roam.x0, RABBIT.roam.x1);
+            rb.y = clamp(y, RABBIT.roam.y0, RABBIT.roam.y1);
+          }
+        }
+        /* 拖耄耋: 挪位置, 拖着的时候它不干活 */
+        if (game.drag.kind === DRAG.CAT && shop.cat) {
+          shop.cat.held = true;
+          shop.cat.x = clamp(x, CAT.roam.x0, CAT.roam.x1);
+          shop.cat.y = clamp(y, CAT.roam.y0, CAT.roam.y1);
+        }
         return;
       }
       game.hover = hitButton(game.buttons, x, y);
@@ -368,6 +439,7 @@ scenes.register(
       const hbPress = game.hotbarPress; // 没拖走 -> 算点击
       game.hotbarPress = null;
       game.hotbarDrag = null;
+      game.ovenDrag = null;
       if (hbPress && hbPress.kind === 'hardware') {
         toggleSmashItem(hbPress.id, hbPress.x, hbPress.y);
         game.active = null;
@@ -412,7 +484,6 @@ scenes.register(
   drawPlates(ctx);
   drawImpact(ctx);
   drawMoney(ctx);
-      drawCart(ctx);
       drawHotbar(ctx);
       drawBench(ctx);
       drawOven(ctx);
@@ -428,20 +499,20 @@ scenes.register(
 
       game.buttons = [
         {
-          id: 'bench',
-          x: W - 532,
+          id: 'rabbit',
+          x: W - 392,
           y: LAYOUT.bottomY + (LAYOUT.bottomH - 68) / 2,
-          w: 220,
+          w: 100,
           h: 68,
-          label: '⚙ 制作台升级',
+          label: '🐰 月兔',
           size: 17,
-          accent: COLORS.gold,
+          accent: COLORS.ok,
         },
         {
           id: 'factory',
-          x: W - 300,
+          x: W - 284,
           y: LAYOUT.bottomY + (LAYOUT.bottomH - 68) / 2,
-          w: 268,
+          w: 252,
           h: 68,
           label: run.factoryOpen ? '🏭 工厂面板已打开' : '🏭 工厂 / 能源核心',
           size: 18,
@@ -455,7 +526,12 @@ scenes.register(
       /* 工厂面板(共享网格 UI, 半透明, 不暂停) */
       if (run.factoryOpen) factoryBoardDraw(ctx, { dim: true, showClose: true });
 
-      /* 投出的五金月饼 + 自动装配飞行的食材: 画在所有面板之上, 否则会被快捷栏/制作台挡住 */
+      /* 月兔/耄耋: 画在所有面板之上(否则会被底栏/原料架挡住)
+       * 但工厂面板打开时不画 —— 那是个铺满屏幕的半透明弹层, 助手会跑到面板上 */
+      if (!run.factoryOpen) drawRabbits(ctx);
+      if (!run.factoryOpen) drawCat(ctx);
+
+      /* 投出的五金月饼 + 飞行的食材: 同样画在面板之上 */
       drawThrows(ctx);
       drawFlyingItems(ctx);
 
@@ -463,10 +539,9 @@ scenes.register(
       if (game.drag) drawDragGhost(ctx, game.drag);
 
 
-      /* 出餐结果飘出 */
-      if (game.resultT > 0 && game.result) drawServeResult(ctx, game.result);
+      /* (出餐评分特效已按需求去掉: 结算逻辑照常, 只是不弹那块评分板了) */
 
-      /* toast */
+      /* toast(只在真出错时用: 没材料 / 台面满 / 烤位被占 之类) */
       if (game.toast) {
         ctx.save();
         ctx.globalAlpha = Math.min(1, game.toast.life);
@@ -498,20 +573,19 @@ function startDay() {
   run.factoryOpen = false;
   run.money = [];
   run.plates = []; // 柜台上摆的月饼(每天清空)
-  run.cart = { x: W / 2, dir: 1 };
   game.dayEnd = false;
   game.smashItem = null;
   game.smashFrom = null;
   game.throws = [];
   game.flyingItems = [];
 
-  /* 制作台托盘 */
+  /* 流浪猫「耄耋」: 每天重新安排 —— 没驯服时随机挑个时间溜进来一次 */
+  shop.cat = null;
+  run.catArriveT = rand(CAT.arriveMin, CAT.arriveMax);
+
+  /* 制作台托�?*/
   run.slots = [];
   for (let i = 0; i < benchSlotCount(); i++) run.slots.push(createSlot());
-  for (let i = 0; i < run.slots.length; i++) {
-    run.slots[i].autoLevel = slotAutoLevel(i);
-    run.slots[i].auto = run.slots[i].autoLevel > 0;
-  }
 
   /* 烤炉 */
   run.oven = [];
@@ -548,13 +622,13 @@ function autoFlightFrom(kind, id) {
 }
 
 /* 起飞: 记一枚飞行中的食材(材料此刻已扣, 落地才真正放进托盘) */
-function spawnAutoFlight(slot, index, kind, id) {
+function spawnAutoFlight(slot, index, kind, id, delay) {
   const from = autoFlightFrom(kind, id);
   const to = slotCenter(index);
   game.flyingItems = game.flyingItems || [];
   game.flyingItems.push({
     t: 0,
-    delay: 0,
+    delay: delay || 0,
     dur: 0.32,
     x0: from.x,
     y0: from.y,
@@ -628,20 +702,6 @@ function slotCenter(index) {
   return { x: r.x + r.w / 2, y: r.y + r.h / 2 + 10 };
 }
 
-/* 把托盘里的半成品退回背包(自动台清料时用, 免得白瞎材料)
- * 材料立刻退回, 同时放一串「飞出」特效(食材从托盘飞回快捷栏) */
-function refundSlot(slot) {
-  if (!slot.crustId) return;
-  const from = slotCenter(run.slots.indexOf(slot));
-  const out = [{ kind: 'crust', id: slot.crustId }];
-  for (const f of slot.fillings) out.push({ kind: 'filling', id: f });
-  for (const o of out) backpackAdd(o.kind, o.id, 1);
-  clearSlot(slot);
-  /* 特效: 一件件错开飞回快捷栏(材料已退, 这里只画) */
-  out.forEach((o, i) => spawnFlyOut(o.kind, o.id, from.x, from.y, i * 0.05));
-}
-
-/* 飞出特效: 从(fromX,fromY)飞回快捷栏里该食材那一行 */
 function spawnFlyOut(kind, id, fromX, fromY, delay) {
   const to = autoFlightFrom(kind, id);
   game.flyingItems = game.flyingItems || [];
@@ -659,152 +719,6 @@ function spawnFlyOut(kind, id, fromX, fromY, delay) {
     mode: 'out', // 只画, 落地不改状态(材料已退)
     slot: null,
   });
-}
-
-/* 这张订单的馅料背包里齐不齐 */
-function autoOrderReady(order) {
-  const need = {};
-  for (const f of order.fillings) need[f] = (need[f] || 0) + 1;
-  for (const k in need) {
-    if (backpackCount('filling', k) < need[k]) return false;
-  }
-  return true;
-}
-
-/* 找一个「订单和当前托盘内容完全对得上」的等待客人(目标走了时转给他, 不浪费) */
-function findMatchingCustomer(slot, autoSlots) {
-  const taken = [];
-  for (const s of autoSlots) {
-    if (s !== slot && s.autoCust) taken.push(s.autoCust);
-  }
-  for (const c of run.customers) {
-    if (c.state !== 'waiting') continue;
-    if (taken.indexOf(c) >= 0) continue;
-    if (c.order.crustId !== slot.crustId) continue;
-    const want = c.order.fillings;
-    if (want.length !== slot.fillings.length) continue;
-    let same = true;
-    for (let i = 0; i < want.length; i++) {
-      if (want[i] !== slot.fillings[i]) { same = false; break; }
-    }
-    if (same) return c;
-  }
-  return null;
-}
-
-/* 给某个自动槽位挑目标客人:
- *   1. 皮都没有的订单直接跳过(开不了工)
- *   2. 优先「馅料齐全」的(能一口气做完), 其次等得最急的
- *   3. 已被其它自动台盯上的客人跳过, 避免抢单 */
-function pickAutoTarget(autoSlots, slot) {
-  const taken = [];
-  for (const s of autoSlots) {
-    if (s !== slot && s.autoCust) taken.push(s.autoCust);
-  }
-  let best = null;
-  let bestScore = -Infinity;
-  for (const c of run.customers) {
-    if (c.state !== 'waiting') continue;
-    if (taken.indexOf(c) >= 0) continue;
-    if (backpackCount('crust', c.order.crustId) < 1) continue;
-    const ready = autoOrderReady(c.order);
-    const urgency = 1 - clamp(c.patienceLeft / c.patienceMax, 0, 1);
-    const score = (ready ? 10 : 0) + urgency * 5;
-    if (score > bestScore) {
-      bestScore = score;
-      best = c;
-    }
-  }
-  return best;
-}
-
-/* 制作台自动化: 每个间隔走一步 —— 先放饼皮, 之后每次叠一层馅
- * 等级越高间隔越短(见 COUNTER.auto.interval); 送烤/出餐仍手动(可选自动烤制)
- *
- * 相比早先的实现, 这里修了几个「会卡住」的问题:
- *   1. 目标客人中途走了 -> 半成品会一直占着托盘; 现在自动退料清空, 重新找活
- *   2. 背包没料时白等一整个间隔; 现在只等 RETRY 秒就重试
- *   3. 只按「等最久」选客人, 可能挑到原料不够的; 现在优先「料齐」的
- *   4. 「只要一张饼皮」的订单(史蒂夫无腐肉)现在能正确标记为已完成 */
-function updateAutoBench(dt) {
-  const autoSlots = run.slots ? run.slots.filter((s) => s.auto) : [];
-  if (!autoSlots.length) return;
-
-  const RETRY = 0.35; // 没料可放时的重试间隔(秒)
-
-  for (const slot of autoSlots) {
-    if (slot.autoPending) continue; // 上一份食材还在飞, 等它落地
-    const index = run.slots.indexOf(slot); // 托盘下标(决定飞行终点)
-    const lv = slot.autoLevel || 1;
-    const interval = (COUNTER.auto.interval[Math.min(lv, COUNTER.auto.interval.length) - 1]) || 3.0;
-
-    /* 目标客人没了(走了/被服务/被砸): 托盘内容还能给别的客人就转过去, 否则退料清空 */
-    if (slot.autoCust && slot.autoCust.state !== 'waiting') {
-      const same = slot.crustId ? findMatchingCustomer(slot, autoSlots) : null;
-      if (same) {
-        slot.autoCust = same;
-      } else {
-        refundSlot(slot);
-        resetAutoSlot(slot);
-      }
-    }
-
-    /* 已经做完: 只等自动烤制/玩家取走, 不占节奏 */
-    if (slot.crustId && slot.autoOrder && slot.autoDone >= slot.autoOrder.length) {
-      slot.autoT = 0;
-      continue;
-    }
-
-    slot.autoT = (slot.autoT || 0) + dt;
-    if (slot.autoT < interval) continue;
-
-    let acted = false;
-
-    /* 空托盘: 取一张皮(飞过去, 落地才算放上) */
-    if (!slot.crustId) {
-      const cust = pickAutoTarget(autoSlots, slot);
-      if (cust && backpackCount('crust', cust.order.crustId) >= 1) {
-        backpackTake('crust', cust.order.crustId, 1);
-        slot.autoCust = cust;
-        slot.autoOrder = cust.order.fillings.slice();
-        slot.autoDone = 0;
-        spawnAutoFlight(slot, index, 'crust', cust.order.crustId);
-        acted = true;
-      }
-    } else if (slot.autoOrder && slot.autoDone < slot.autoOrder.length) {
-      /* 有皮了: 叠下一层馅(同样飞过去) */
-      const f = slot.autoOrder[slot.autoDone];
-      if (backpackCount('filling', f) >= 1) {
-        backpackTake('filling', f, 1);
-        slot.autoDone += 1;
-        spawnAutoFlight(slot, index, 'filling', f);
-        acted = true;
-      }
-    }
-
-    /* 取料成功就重置节奏; 落地音效在 updateFlyingItems 里放 */
-    slot.autoT = acted ? 0 : Math.max(0, interval - RETRY);
-  }
-
-  /* 自动烤制: 自动制作台装好的月饼自动送进空烤位 */
-  if (counterLevel('autoBake') > 0) {
-    for (const slot of run.slots) {
-      if (!slot.auto || !slotReady(slot)) continue;
-      const freeOven = run.oven.find((os) => os.state === 'idle');
-      if (!freeOven) break;
-      const moon = {
-        crustId: slot.crustId,
-        fillings: slot.fillings.slice(),
-        bakeTime: 0,
-        burnt: false,
-      };
-      if (ovenPut(freeOven, moon).ok) {
-        clearSlot(slot);
-        resetAutoSlot(slot);
-        SFX.click();
-      }
-    }
-  }
 }
 
 /* ---- 拖拽源识别 ---- */
@@ -836,6 +750,21 @@ function pickDraggable(x, y) {
     if (pointInRect(x, y, r)) {
       return { kind: DRAG.OVEN, index: i, x, y };
     }
+  }
+
+  /* 月兔(拖它可以换位置) */
+  for (let i = 0; i < (shop.rabbits || []).length; i++) {
+    const rb = shop.rabbits[i];
+    /* 抓取范围跟着体型放大(1.5 倍) */
+    if (Math.abs(x - rb.x) <= 45 && Math.abs(y - rb.y) <= 60) {
+      return { kind: DRAG.RABBIT, index: i, x, y };
+    }
+  }
+
+  /* 流浪猫耄耋(也能拖着挪位置) */
+  const catNow = shop.cat;
+  if (catNow && !catNow.gone && !catNow.flung && Math.abs(x - catNow.x) <= 40 && Math.abs(y - catNow.y) <= 56) {
+    return { kind: DRAG.CAT, x, y };
   }
 
   /* 柜台上摆好的月饼 */
@@ -902,7 +831,7 @@ function dropDragged(drag, x, y) {
       }
       return;
     }
-    fail('要拖到制作台上'); // 没命中任何托盘, 不消耗
+    /* 拖到空处: 静默退回, 不提示也不响(不消耗) */
     return;
   }
 
@@ -953,12 +882,41 @@ function dropDragged(drag, x, y) {
       if (!moon) return;
       if (!placeOnCounter(moon, x)) {
         ovenPut(os, moon); // 台面满了, 放回烤位
-        return fail('台面摆满了(' + MAX_PLATES + ')');
+        return fail('台面摆满了 ' + MAX_PLATES + '/' + MAX_PLATES);
       }
       SFX.stamp();
       return;
     }
-    fail('拖给客人出餐, 或放到柜台上');
+    /* 拖到空处: 静默退回 */
+    return;
+  }
+
+  /* 拖月兔: 松手就停在放下的位置(限制在活动范围内) */
+  if (drag.kind === DRAG.RABBIT) {
+    const rb = (shop.rabbits || [])[drag.index];
+    if (rb) {
+      rb.held = false;
+      rb.x = clamp(x, RABBIT.roam.x0, RABBIT.roam.x1);
+      rb.y = clamp(y, RABBIT.roam.y0, RABBIT.roam.y1);
+      rb.vx = 0;
+      rb.vy = 0;
+      rb.turnT = 0.4;
+      SFX.click();
+    }
+    return;
+  }
+
+  /* 拖耄耋: 松手停在那儿 */
+  if (drag.kind === DRAG.CAT) {
+    if (shop.cat) {
+      shop.cat.held = false;
+      shop.cat.x = clamp(x, CAT.roam.x0, CAT.roam.x1);
+      shop.cat.y = clamp(y, CAT.roam.y0, CAT.roam.y1);
+      shop.cat.vx = 0;
+      shop.cat.vy = 0;
+      shop.cat.turnT = 0.4;
+      SFX.click();
+    }
     return;
   }
 
@@ -1030,7 +988,7 @@ function dropDragged(drag, x, y) {
     }
     /* 拖回背包/别处: 自动退回, 无损失 */
     if (pointInRect(x, y, factoryPanelRect())) return;
-    return fail('拖到空槽位上才能装上');
+    return; // 拖到空处: 静默退回
   }
 }
 
@@ -1073,6 +1031,19 @@ function ovenMaxScroll() {
 function clampOvenScroll() {
   game.ovenScroll = clamp(game.ovenScroll || 0, 0, ovenMaxScroll());
 }
+/* 烤位滚动条的位置与大小(画和点击命中都用它, 保证对得上) */
+function ovenBarThumb() {
+  const area = ovenPanelArea();
+  const maxS = ovenMaxScroll();
+  if (maxS <= 0) return null;
+  const thumbH = Math.max(28, area.h * (area.h / ovenContentH()));
+  return {
+    x: area.x + area.w - 7,
+    y: area.y + (area.h - thumbH) * ((game.ovenScroll || 0) / maxS),
+    w: 7,
+    h: thumbH,
+  };
+}
 function ovenRect(i) {
   const o = LAYOUT.oven;
   const pad = 14;
@@ -1082,6 +1053,18 @@ function ovenRect(i) {
     w: o.w - pad * 2,
     h: OVEN_SLOT_H,
   };
+}
+
+/* 月兔/耄耋走路用的「稳定锚点」
+ * 不能用 ovenRect / hotbarItems 的 rect: 它们带面板滚动偏移,
+ * 玩家一滚, 助手的走路目标就跟着跑偏(滚出可视区还会够不着) */
+function ovenAnchorPoint() {
+  const o = LAYOUT.oven;
+  return { x: o.x + o.w / 2, y: o.y + o.h - 16 };
+}
+function shelfAnchorPoint() {
+  const b = LAYOUT.backpack;
+  return { x: b.x + b.w / 2, y: b.y + b.h - 28 };
 }
 
 /* 槽位右上角的升级按钮 */
@@ -1100,7 +1083,7 @@ function slotUpgradeButtons() {
   for (let i = 0; i < run.slots.length; i++) {
     list.push(Object.assign({
       id: 'upgBench', value: i, label: '⬆', size: 15,
-      accent: run.slots[i].auto ? COLORS.ok : COLORS.goldLight,
+      accent: COLORS.goldLight,
     }, slotUpgradeRect(i)));
   }
   const oArea = ovenPanelArea();
@@ -1370,6 +1353,234 @@ function drawCounter(g) {
   g.restore();
 }
 
+/* ---- 绘制: 月兔(在柜台前来回溜达) ---- */
+/* 画一只月兔: 有贴图(月兔1~4.png)就用贴图, 没有就退回特殊立绘 */
+function drawRabbitFigure(g, art, cx, baseY, h) {
+  const key = 'rabbit_' + (art + 1);
+  const spr = typeof img === 'function' ? img(key) : null;
+  if (spr) {
+    const bw = h * ((spr.naturalWidth || spr.width) / (spr.naturalHeight || spr.height));
+    drawSprite(g, key, cx - bw / 2, baseY - h, bw, h);
+    return;
+  }
+  drawNpc(g, RABBIT_ART_NPC[art] != null ? RABBIT_ART_NPC[art] : 4, cx, baseY, h, 'npc_special');
+}
+
+function drawRabbits(g) {
+  for (const r of shop.rabbits || []) {
+    const hop = Math.abs(Math.sin(r.hop)) * 7;
+    const y = r.y - hop;
+    g.save();
+    g.globalAlpha = 0.22;
+    g.fillStyle = '#3a1f0d';
+    g.beginPath();
+    g.ellipse(r.x, r.y + 4, 32, 10, 0, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+    const h = RABBIT.bodyH || 99;
+    g.save();
+    if (r.dir < 0) {
+      g.translate(r.x * 2, 0);
+      g.scale(-1, 1);
+    }
+    drawRabbitFigure(g, r.art, r.x, y, h);
+    g.restore();
+    /* 手上的东西: 吸附在头顶(取料/搬月饼都看得见)
+     * 拾取物放大到 2 倍(原来 h*0.48), 同时抬高免得压住脑袋 */
+    if (r.carry) {
+      const ix = r.x;
+      const iy = y - h * 1.45;
+      const sz = h * 0.96;
+      if (r.carry.kind === 'moon') {
+        const mc = findCrustDef(r.carry.moon ? r.carry.moon.crustId : null);
+        if (!drawCrustPart(g, mc ? mc.col : 0, 'done', ix - sz / 2, iy - sz / 2, sz, sz)) {
+          g.fillStyle = COLORS.crust;
+          g.beginPath();
+          g.arc(ix, iy, sz / 2.2, 0, Math.PI * 2);
+          g.fill();
+        }
+      } else if (r.carry.kind === 'crust') {
+        const cd = findCrustDef(r.carry.id);
+        if (!drawCrustPart(g, cd ? cd.col : 0, 'raw', ix - sz / 2, iy - sz / 2, sz, sz)) {
+          g.fillStyle = cd ? cd.color : COLORS.crust;
+          g.beginPath();
+          g.arc(ix, iy, sz / 2.2, 0, Math.PI * 2);
+          g.fill();
+        }
+      } else {
+        const fd = findFillingDef(r.carry.id);
+        if (!drawFillingIcon(g, fd ? fd.index : 0, ix, iy, sz)) {
+          g.fillStyle = fd ? fd.color : COLORS.panelInk;
+          g.beginPath();
+          g.arc(ix, iy, sz / 2.2, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+    }
+  }
+}
+
+/* ---- 绘制: 流浪猫「耄耋」(程序化画的灰狸花猫, 没贴图) ---- */
+function drawCat(g) {
+  const cat = shop.cat;
+  if (!cat || !catActive()) return;
+  if (cat.gone && !cat.flung) return; // 溜走了/被打飞了
+  const hop = Math.abs(Math.sin(cat.hop)) * 4;
+  const y = cat.y - hop;
+  const eating = cat.state === 'eat';
+  const hunting = cat.state === 'go' && cat.task;
+
+  /* 被打飞: 整只甩出去 + 翻滚 */
+  g.save();
+  if (cat.flung) {
+    g.translate(cat.flung.x, cat.flung.y);
+    g.translate(cat.x, y);
+    g.rotate(cat.flung.rot);
+    g.translate(-cat.x, -y);
+    g.globalAlpha = clamp(1 - Math.max(0, cat.flung.t - 0.5) / 0.4, 0, 1);
+  } else if (cat.dodgeT > 0) {
+    g.translate(Math.sin(cat.dodgeT * 50) * 7, 0); // 驯服后挨打时的小躲闪
+  }
+
+  g.save();
+  g.globalAlpha = 0.22;
+  g.fillStyle = '#3a1f0d';
+  g.beginPath();
+  g.ellipse(cat.x, cat.y + 4, 21, 6.5, 0, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+
+  const spr = typeof img === 'function' ? img('cat') : null;
+  if (spr) {
+    /* 有贴图(耄耋.png): 直接画, 吃东西时上下咀嚼 */
+    const chomp = eating ? 1 - 0.05 + Math.abs(Math.sin(cat.hop * 3)) * 0.06 : 1;
+    const h = 62 * chomp;
+    const bw = h * ((spr.naturalWidth || spr.width) / (spr.naturalHeight || spr.height));
+    g.save();
+    if (cat.dir < 0) {
+      g.translate(cat.x * 2, 0);
+      g.scale(-1, 1);
+    }
+    drawSprite(g, 'cat', cat.x - bw / 2, y - h, bw, h);
+    g.restore();
+  } else {
+    drawCatBody(g, cat, y, eating, hunting);
+  }
+
+  /* 驯服标记: 头顶一颗小红心 */
+  if (cat.tamed || catIsTamed()) {
+    g.save();
+    g.fillStyle = '#e2557b';
+    g.beginPath();
+    g.arc(cat.x - 4, y - 68, 5, 0, Math.PI * 2);
+    g.arc(cat.x + 4, y - 68, 5, 0, Math.PI * 2);
+    g.fill();
+    g.beginPath();
+    g.moveTo(cat.x - 9, y - 66);
+    g.lineTo(cat.x + 9, y - 66);
+    g.lineTo(cat.x, y - 54);
+    g.closePath();
+    g.fill();
+    g.restore();
+  }
+
+  /* 目标提示: 扑人时头顶冒个「!」 */
+  if (hunting && cat.task.kind === 'attack') {
+    g.save();
+    setFont(g, 26, 700);
+    drawText(g, '!', cat.x, y - 58, {
+      size: 26, weight: 700, align: 'center', color: COLORS.fail, stroke: '#3a1f0d', strokeWidth: 4,
+    });
+    g.restore();
+  }
+  g.restore(); // 打飞的外层变换
+  drawCatPawFx(g);
+}
+
+/* 没有猫贴图时的程序化兜底(灰狸花猫) */
+function drawCatBody(g, cat, y, eating, hunting) {
+  g.save();
+  g.translate(cat.x, y);
+  if (cat.dir < 0) g.scale(-1, 1);
+
+  /* 尾巴(高兴时翘起来摆) */
+  g.strokeStyle = CAT.body;
+  g.lineWidth = 5;
+  g.lineCap = 'round';
+  const wag = Math.sin(cat.hop * 1.4) * 6;
+  g.beginPath();
+  g.moveTo(-15, -12);
+  g.quadraticCurveTo(-32, -20 + wag, -26 - wag * 0.4, -36 + wag);
+  g.stroke();
+
+  /* 身体 + 肚皮 */
+  g.fillStyle = CAT.body;
+  g.beginPath();
+  g.ellipse(0, -12, 17, 12, 0, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = CAT.belly;
+  g.beginPath();
+  g.ellipse(3, -8, 11, 7, 0, 0, Math.PI * 2);
+  g.fill();
+
+  /* 头 */
+  g.fillStyle = CAT.body;
+  g.beginPath();
+  g.arc(14, -25, 12, 0, Math.PI * 2);
+  g.fill();
+  /* 耳朵 */
+  g.beginPath();
+  g.moveTo(5, -33);
+  g.lineTo(8, -45);
+  g.lineTo(16, -35);
+  g.closePath();
+  g.fill();
+  g.beginPath();
+  g.moveTo(20, -35);
+  g.lineTo(26, -45);
+  g.lineTo(28, -32);
+  g.closePath();
+  g.fill();
+
+  /* 眼睛: 平时竖瞳, 逮东西/吃东西时眯起来 */
+  for (const ex of [9, 20]) {
+    g.fillStyle = '#ffe36a';
+    g.beginPath();
+    g.ellipse(ex, -26, 3.4, hunting || eating ? 2.2 : 3.8, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#2a1a10';
+    g.beginPath();
+    g.ellipse(ex, -26, 1.1, hunting || eating ? 2.0 : 3.2, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  /* 口鼻 + 胡须 */
+  g.fillStyle = CAT.belly;
+  g.beginPath();
+  g.ellipse(20, -20, 6.5, 4.5, 0, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#e08f9a';
+  g.beginPath();
+  g.arc(24, -21.5, 1.8, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = 'rgba(216,207,196,0.85)';
+  g.lineWidth = 1.2;
+  for (const dy of [-3, 0, 3]) {
+    g.beginPath();
+    g.moveTo(24, -20 + dy * 0.5);
+    g.lineTo(38, -22 + dy);
+    g.stroke();
+  }
+  /* 吃东西时张着嘴 */
+  if (eating) {
+    g.fillStyle = '#3a1f0d';
+    g.beginPath();
+    g.ellipse(23, -18, 3.2, 2.6 + Math.abs(Math.sin(cat.hop * 3)) * 1.6, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.restore();
+}
+
 /* ---- 绘制: 客人(柜台后的固定站位, 只露上半身, 从右侧走进来) ---- */
 function drawCustomers(g) {
   for (const c of run.customers) {
@@ -1579,6 +1790,14 @@ function drawOrderBubble(g, c, x, y, w) {
   });
   drawMiniOrder(g, c.order, x + 8, y + 26, w - 16);
 
+  /* 耐心无限的客人(找茬的刘华强): 画一条金色满格 + ∞ */
+  if (!isFinite(c.patienceMax)) {
+    uiBar(g, x + 10, y + h - 15, w - 20, 9, 1, COLORS.gold);
+    drawText(g, '∞', x + w - 10, y + h - 15, {
+      size: 12, weight: 700, align: 'right', color: COLORS.goldLight,
+    });
+    return;
+  }
   const urgency = clamp(c.patienceLeft / c.patienceMax, 0, 1);
   const col = c.state === 'angry' ? COLORS.fail : urgency > 0.5 ? COLORS.ok : urgency > 0.25 ? COLORS.warn : COLORS.fail;
   uiBar(g, x + 10, y + h - 15, w - 20, 9, urgency, col);
@@ -1694,7 +1913,7 @@ function collectMoney(coin) {
   run.money.splice(i, 1);
   shop.coins += coin.value;
   shop.stats.totalCoins += coin.value;
-  addFloater('+' + coin.value, coin.x, coin.y - 18, COLORS.gold, 0.9);
+  spawnCoinFly(coin.x, coin.y, coin.value); // 钱飞向顶栏的金币图标
   SFX.coin();
 }
 
@@ -1712,72 +1931,6 @@ function collectMoneyAround(x, y) {
   return n;
 }
 
-/* ---- 收银小车(柜台升级解锁): 在柜台上来回移动, 自动捡起沿途金币 ---- */
-function updateCart(dt) {
-  const lv = counterLevel('cart');
-  if (lv <= 0) return;
-  if (!run.cart) run.cart = { x: W / 2, dir: 1 };
-
-  const speed = COUNTER.cart.speed[Math.min(lv, COUNTER.cart.speed.length) - 1];
-  const minX = 90;
-  const maxX = W - 90;
-  run.cart.x += run.cart.dir * speed * dt;
-  if (run.cart.x <= minX) {
-    run.cart.x = minX;
-    run.cart.dir = 1;
-  } else if (run.cart.x >= maxX) {
-    run.cart.x = maxX;
-    run.cart.dir = -1;
-  }
-
-  /* 自动捡起落地的金币 */
-  const radius = COUNTER.cart.radius[Math.min(lv, COUNTER.cart.radius.length) - 1];
-  const cy = moneyRestY();
-  for (let i = run.money.length - 1; i >= 0; i--) {
-    const m = run.money[i];
-    if (!m.rest) continue;
-    if (dist(run.cart.x, cy, m.x, m.y) <= radius) collectMoney(m);
-  }
-}
-
-function drawCart(g) {
-  if (counterLevel('cart') <= 0 || !run.cart) return;
-  const coinImg = img('ui_coin');
-  g.save();
-  g.translate(run.cart.x, moneyRestY());
-  /* 影子 */
-  g.fillStyle = 'rgba(0,0,0,0.25)';
-  g.beginPath();
-  g.ellipse(0, 16, 26, 7, 0, 0, Math.PI * 2);
-  g.fill();
-  /* 轮子 */
-  g.fillStyle = '#20150d';
-  g.beginPath();
-  g.arc(-13, 7, 6, 0, Math.PI * 2);
-  g.fill();
-  g.beginPath();
-  g.arc(13, 7, 6, 0, Math.PI * 2);
-  g.fill();
-  /* 车身 */
-  fillRoundRect(g, -24, -24, 48, 30, 8, '#7e5b3e');
-  fillRoundRect(g, -20, -20, 40, 12, 5, '#b78a5d');
-  /* 车上的硬币堆 */
-  for (let i = 0; i < 3; i++) {
-    const cx = -8 + i * 8;
-    const cy = -28 - (i % 2) * 3;
-    if (coinImg) {
-      g.drawImage(coinImg, cx - 7, cy - 7, 14, 14);
-    } else {
-      g.fillStyle = COLORS.gold;
-      g.beginPath();
-      g.arc(cx, cy, 6, 0, Math.PI * 2);
-      g.fill();
-    }
-  }
-  g.restore();
-}
-
-/* 客人订单(文字): 皮 + 馅 */
 function drawOrderText(g, order, x, y, w) {
   const crust = findCrustDef(order.crustId);
   drawText(g, '皮:' + (crust ? crust.name : order.crustId), x, y + 8, {
@@ -1830,7 +1983,7 @@ function drawMiniOrder(g, order, x, y, w) {
 function drawHotbar(g) {
   const s = LAYOUT.backpack;
   uiPanel(g, s.x, s.y, s.w, s.h, { r: 14 });
-  drawText(g, '快捷栏 · 拖动取用', s.x + 14, s.y + 24, { size: 16, weight: 700, color: COLORS.panelTitle });
+  drawText(g, '快捷栏', s.x + 14, s.y + 24, { size: 16, weight: 700, color: COLORS.panelTitle });
 
   clampHotbarScroll();
   const a = hotbarPanelArea();
@@ -1841,7 +1994,7 @@ function drawHotbar(g) {
 
   const items = hotbarItems();
   if (!items.length) {
-    drawText(g, '背包空：点下方「背包」按钮', s.x + 14, s.y + 78, { size: 13, color: COLORS.textDim });
+    drawText(g, '背包空', s.x + 14, s.y + 78, { size: 13, color: COLORS.textDim });
   }
   for (const it of items) {
     const r = it.rect;
@@ -1953,8 +2106,15 @@ function updateThrows(dt) {
     th.t += dt;
     if (th.t < th.dur) continue;
     game.throws.splice(i, 1);
+    /* 砸猫: 落点附近有耄耋 -> 打飞它 */
+    const catNow = shop.cat;
+    if (catNow && !catNow.gone && !catNow.flung &&
+        Math.abs(th.x1 - catNow.x) <= 62 && Math.abs(th.y1 - catNow.y) <= 78) {
+      catKnockOut();
+      continue;
+    }
     const c = th.target;
-    if (c && c.state === 'waiting') smashImpact(c, th.x1, th.y1); // 客人还在才算命中
+    if (c && c.state === 'waiting') smashImpact(c, th.x1, th.y1); // 砸人: 还在就结算
   }
 }
 
@@ -1994,6 +2154,7 @@ function smashImpact(c, x, y) {
   };
   game.impact = { x: x, y: y, t: 0 };
   addShake(DAY.smashShake || 12);
+  SFX.hit(); // 五金月饼命中
 
   if (harass) {
     /* 打飞找茬的会掉他身上的东西: 刘华强 -> 西瓜刀(只有第一次给, 免得反复刷) */
@@ -2001,14 +2162,12 @@ function smashImpact(c, x, y) {
     if (dropId && !hasComponentInstalled(dropId) && !(shop.components[dropId] > 0)) {
       shop.components[dropId] = (shop.components[dropId] || 0) + 1;
       const cd = findComponentDef(dropId);
-      showScreenText('获得 组件「' + (cd ? cd.name : dropId) + '」', '去工厂装上试试', COLORS.gold);
+      showScreenText('获得 组件「' + (cd ? cd.name : dropId) + '」', '', COLORS.gold);
       SFX.unlock();
     }
     SFX.success();
   } else {
-    const pen = DAY.smashRepPenalty || 5;
-    shop.reputation = Math.max(0, shop.reputation - pen);
-    addFloater('-' + pen + ' 口碑', 640, 250, COLORS.fail, 1.6);
+    /* (口碑已并入评分: 砸普通客人不再单独扣分, 但也没给他出餐, 自然不会有好评) */
     SFX.fail();
   }
 }
@@ -2017,7 +2176,7 @@ function smashImpact(c, x, y) {
 function drawBench(g) {
   const b = LAYOUT.bench;
   uiPanel(g, b.x, b.y, b.w, b.h, { r: 14 });
-  drawText(g, '制作台（拖面皮 → 拖馅料叠加）', b.x + 14, b.y + 24, { size: 15, weight: 700, color: COLORS.panelTitle });
+  drawText(g, '制作台', b.x + 14, b.y + 24, { size: 15, weight: 700, color: COLORS.panelTitle });
 
   run.slots.forEach((slot, i) => {
     const r = slotRect(i);
@@ -2042,7 +2201,7 @@ function drawBench(g) {
 function drawOven(g) {
   const o = LAYOUT.oven;
   uiPanel(g, o.x, o.y, o.w, o.h, { r: 14 });
-  drawText(g, '烤炉（拖入烘烤 · 滚轮滚动）', o.x + 14, o.y + 26, { size: 15, weight: 700, color: COLORS.panelTitle });
+  drawText(g, '烤炉', o.x + 14, o.y + 26, { size: 15, weight: 700, color: COLORS.panelTitle });
 
   clampOvenScroll();
   const area = ovenPanelArea();
@@ -2090,13 +2249,11 @@ function drawOven(g) {
     drawText(g, '还没有烤位', o.x + o.w / 2, o.y + o.h / 2, { size: 14, align: 'center', color: COLORS.textDim });
   }
 
-  /* 滚动条 */
-  const maxS = ovenMaxScroll();
-  if (maxS > 0) {
-    const thumbH = Math.max(28, area.h * (area.h / ovenContentH()));
-    const ty = area.y + (area.h - thumbH) * ((game.ovenScroll || 0) / maxS);
-    fillRoundRect(g, area.x + area.w - 7, area.y, 7, area.h, 4, 'rgba(19,16,13,0.5)');
-    fillRoundRect(g, area.x + area.w - 7, ty, 7, thumbH, 4, 'rgba(196,158,86,0.75)');
+  /* 滚动条(位置统一由 ovenBarThumb 算, 触摸拖动/滚轮都改 ovenScroll) */
+  const th2 = ovenBarThumb();
+  if (th2) {
+    fillRoundRect(g, th2.x, area.y, th2.w, area.h, 4, 'rgba(19,16,13,0.5)');
+    fillRoundRect(g, th2.x, th2.y, th2.w, th2.h, 4, 'rgba(196,158,86,0.75)');
   }
 }
 
@@ -2220,7 +2377,7 @@ function drawFactoryPanel(g) {
 
   uiPanel(g, px, py, p.w, p.h, { r: 20, color: COLORS.panelLight });
 
-  drawText(g, '工厂 · 槽位与组件（营业继续中，客人还在等）', px + 24, py + 32, {
+  drawText(g, '工厂 · 槽位与组件', px + 24, py + 32, {
     size: 20, weight: 700, color: COLORS.panelTitle,
   });
   drawText(g, '开槽 → 装组件 → 升级组件　|　Esc / 关闭按钮 退出', px + 24, py + 58, {
@@ -2241,8 +2398,7 @@ function drawFactoryList(g) {
   if (!ids.length) {
     game.factorySel = null;
     drawText(g, '还没有工厂上场', p.x + 20, p.y + 120, { size: 13, color: COLORS.textDim });
-    drawText(g, '去「工厂管理」把工厂拖到网格上', p.x + 20, p.y + 144, { size: 11, color: COLORS.textDim });
-    return;
+        return;
   }
   const sel = shop.units[game.factorySel] ? game.factorySel : ids[0];
   game.factorySel = sel;
@@ -2325,7 +2481,7 @@ function drawSelectedFactory(g) {
   }
 
   /* 槽位格 */
-  drawText(g, '槽位（从右侧拖组件到空格 · 点已装可升级/卸下）', cx, p.y + 138, {
+  drawText(g, '槽位', cx, p.y + 138, {
     size: 12, weight: 600, color: COLORS.textDim,
   });
   u.slots.forEach((slot, i) => {
@@ -2361,7 +2517,7 @@ function drawSelectedFactory(g) {
     game.buttons.push(Object.assign({ id: 'buySlot', disabled: !afford }, br));
   } else {
     uiPanel(g, br.x, br.y, br.w, br.h, { r: 10, shadow: false });
-    drawText(g, '槽位已满（' + MAX_SLOTS + '）', br.x + br.w / 2, br.y + br.h / 2, {
+    drawText(g, '槽位已满 ' + MAX_SLOTS + '/' + MAX_SLOTS, br.x + br.w / 2, br.y + br.h / 2, {
       size: 13, align: 'center', color: COLORS.textDim,
     });
   }
@@ -2379,7 +2535,7 @@ function drawSelectedFactory(g) {
   uiPanel(g, sb.x, sb.y, sb.w, sb.h, { r: 10, shadow: false });
   drawText(g, '组装效果', sb.x + 12, sb.y + 18, { size: 13, weight: 600, color: COLORS.panelTitle });
   const effects = collectFactoryEffects(u);
-  drawText(g, effects || '（空槽）', sb.x + 12, sb.y + 42, {
+  drawText(g, effects || '空槽', sb.x + 12, sb.y + 42, {
     size: 11, color: effects ? COLORS.panelInk : COLORS.textDim, maxWidth: sb.w - 200,
   });
   /* 烤位在右下角小按钮 */
@@ -2395,7 +2551,7 @@ function drawSelectedFactory(g) {
     }, r));
     game.buttons.push(Object.assign({ id: 'ovenUpgrade', value: nextUp.id, disabled: !afford }, r));
   } else {
-    drawText(g, '烤位已满（' + OVEN.maxSlots + '）', sb.x + sb.w - 12, sb.y + sb.h - 24, {
+    drawText(g, '烤位已满 ' + OVEN.maxSlots + '/' + OVEN.maxSlots, sb.x + sb.w - 12, sb.y + sb.h - 24, {
       size: 11, align: 'right', color: COLORS.textDim,
     });
   }
@@ -2412,7 +2568,7 @@ function collectFactoryEffects(rt) {
     const cd = findComponentDef(slot.compId);
     if (!cd) continue;
     const e = cd.effect;
-    if (e.speed) speed.push(cd.name + '+' + (e.speed * slot.level).toFixed(1));
+    if (e.speed) speed.push(cd.name + '+' + Math.round(e.speed * slot.level * 100) + '%');
     if (e.quality) quality.push(cd.name + '+' + (e.quality * slot.level).toFixed(1));
     if (e.unlock) unlocks.push(cd.name);
   }
@@ -2428,10 +2584,10 @@ function drawComponentBag(g) {
   const bx = p.x + 852;
 
   /* 背包 */
-  drawText(g, '组件背包（拖到左侧空槽）', bx, p.y + 104, { size: 13, weight: 600, color: COLORS.textDim });
+  drawText(g, '组件背包', bx, p.y + 104, { size: 13, weight: 600, color: COLORS.textDim });
   const owned = Object.keys(shop.components).filter((id) => shop.components[id] > 0);
   if (!owned.length) {
-    drawText(g, '背包为空，去下方购买', bx + 4, p.y + 158, { size: 12, color: COLORS.textDim });
+    drawText(g, '背包为空', bx + 4, p.y + 158, { size: 12, color: COLORS.textDim });
   }
   owned.slice(0, 6).forEach((compId, i) => {
     const cd = findComponentDef(compId);
@@ -2453,7 +2609,7 @@ function drawComponentBag(g) {
     g.restore();
   });
   if (owned.length > 6) {
-    drawText(g, '共 ' + owned.length + ' 种（仅显示前 6）', bx, p.y + 300, { size: 10, color: COLORS.textDim });
+    drawText(g, '共 ' + owned.length + ' 种 · 仅显示前 6', bx, p.y + 300, { size: 10, color: COLORS.textDim });
   }
 
   /* 购买 */
@@ -2537,6 +2693,8 @@ function drawDragGhost(g, drag) {
   } else if (drag.kind === DRAG.SLOT) {
     const slot = run.slots[drag.index];
     if (slot) drawSlotMoon(g, slot, drag.x, drag.y, 46);
+  } else if (drag.kind === DRAG.RABBIT || drag.kind === DRAG.CAT) {
+    /* 不画替身: 月兔/耄耋本体已经跟着手指走了, 再画一只就是重影 */
   } else if (drag.kind === DRAG.PLATE) {
     const p = run.plates[drag.index];
     if (p) drawSlotMoon(g, { crustId: p.moon.crustId, fillings: p.moon.fillings }, drag.x, drag.y, PLATE_R, { wrapped: true });
@@ -2571,29 +2729,10 @@ function drawDragGhost(g, drag) {
   g.restore();
 }
 
-/* 出餐结果飘字 */
-function drawServeResult(g, res) {
-  const x = W / 2;
-  const y = 300;
-  g.save();
-  g.globalAlpha = Math.min(1, game.resultT / 0.4);
-  const fx = res.perfect || res.stars >= 3 ? 'fx_success' : res.stars <= 1 ? 'fx_fail' : null;
-  if (fx && img(fx)) g.drawImage(img(fx), x - 140, y - 190, 280, 280);
-  uiPanel(g, x - 160, y - 60, 320, 120, { r: 16 });
-  drawText(g, res.perfect ? '完美！' : res.stars >= 3 ? '不错！' : '一般', x, y - 24, {
-    size: 24, weight: 700, align: 'center', color: res.perfect ? COLORS.ok : COLORS.goldLight,
-  });
-  drawText(g, '★'.repeat(res.stars) + '☆'.repeat(5 - res.stars), x, y + 8, {
-    size: 20, align: 'center', color: COLORS.gold,
-  });
-  drawText(g, '+' + formatNum(res.coins), x, y + 40, { size: 22, weight: 700, align: 'center', color: COLORS.gold });
-  g.restore();
-}
-
 /* 提示文字 */
 function hintText() {
   if (!run.customers.length) return '等待客人进店…';
-  return '拖面皮到托盘 → 拖馅料叠加 → 拖到烤炉 → 拖给客人';
+  return ''; // 不再显示操作教程
 }
 
 /* ---- 日终界面几何 ---- */
@@ -2614,7 +2753,10 @@ function drawDayEnd(g) {
   const rows = [
     ['服务客人', run.dayServed + ' 位'],
     ['流失客人', run.dayLost + ' 位'],
-    ['累计口碑', shop.reputation],
+
+    ['店铺评分', (typeof shopRating === 'function' && shopRating() != null)
+      ? formatRating(ratingSubmitValue()) + ' 分 · ' + (shop.ratingCount || 0) + ' 位客人评分'
+      : '评价不足 · ' + (shop.ratingCount || 0) + '/' + (RATING.minCount + 1)],
     ['当前金币', formatNum(shop.coins)],
   ];
   rows.forEach((r, i) => {

@@ -18,8 +18,27 @@ const stockingUI = {
   onCancel: null,
 };
 
+/* 打开备货: 默认勾上「上次的菜单」(没有就默认勾第一个饼皮+第一种馅料)
+ * 这样每天只需确认一下, 不用重复点选 */
 function stockingOpen() {
   stockingUI.picked = {};
+  const cat = stockingCatalog();
+  const pick = (kind, id) => {
+    if (cat.some((it) => it.kind === kind && it.id === id)) stockingUI.picked[kind + ':' + id] = true;
+  };
+  const last = shop.lastMenu;
+  if (last) {
+    for (const id of last.crusts || []) pick('crust', id);
+    for (const id of last.fillings || []) pick('filling', id);
+  }
+  if (!stockingSelected('crust').length) {
+    const first = cat.find((it) => it.kind === 'crust');
+    if (first) stockingUI.picked['crust:' + first.id] = true;
+  }
+  if (!stockingSelected('filling').length) {
+    const first = cat.find((it) => it.kind === 'filling');
+    if (first) stockingUI.picked['filling:' + first.id] = true;
+  }
   stockingUI.open = true;
 }
 function stockingPicked(it) {
@@ -134,6 +153,7 @@ function stockingConfirm() {
   }
   /* 今日菜单: 顾客只点这些 (不花钱, 食材靠工厂产) */
   run.orderPool = { crusts: crusts, fillings: fillings };
+  shop.lastMenu = { crusts: crusts, fillings: fillings }; // 记住, 下次默认勾上
   stockingUI.open = false;
   SFX.click();
   if (stockingUI.onConfirm) stockingUI.onConfirm();
@@ -149,7 +169,7 @@ function drawStockingWindow(g) {
 
   uiPanel(g, p.x, p.y, p.w, p.h, { r: 20, color: COLORS.panelDark });
   drawText(g, '今日菜单', p.x + 28, p.y + 38, { size: 25, weight: 700, color: COLORS.panelTitle });
-  drawText(g, '免费勾选今天要卖的食材，顾客只会点菜单里的东西（至少各 1 种）', p.x + 28, p.y + 68, {
+  drawText(g, '今天要卖的食材', p.x + 28, p.y + 68, {
     size: 13, color: COLORS.textDim,
   });
   const cr = stockingCloseRect();

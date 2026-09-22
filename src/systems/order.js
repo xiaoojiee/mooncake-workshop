@@ -5,7 +5,8 @@
 /* global shop, run, ORDER_TEMPLATES, CUSTOMERS, CRUSTS, FILLINGS, ASSEMBLY, DAY,
    moonQuality, findCrustDef, findFillingDef,
    findItemDef, isUnlocked, unlockedCrusts, addFloater, SFX, showScreenText, submitScores,
-   saveGame, starOf, scoreServe, pick, rand, clamp, rollComponentDrop, COLORS */
+   saveGame, starOf, scoreServe, pick, rand, clamp, rollComponentDrop, COLORS ,
+   rabbitGift, freeUpgradeGift , playSound , RATING */
 
 /* 生成当天客人的到店计划(不立即入场) */
 function buildDayPlan(day) {
@@ -83,6 +84,39 @@ function randomCrustId() {
   return pick(pool).id;
 }
 
+/* ---- 店铺评分(外卖软件那套) ---- */
+
+/* 平均星级(0~5); 评价人数不够(≤ RATING.minCount)时返回 null(还没分数) */
+function shopRating() {
+  const n = shop.ratingCount || 0;
+  if (n <= RATING.minCount) return null;
+  return (shop.ratingSum || 0) / n;
+}
+
+/* 评分榜上报值: 平均星级 × 10^小数位, 取整(B站 submitScore 只收整数) */
+function ratingSubmitValue() {
+  const r = shopRating();
+  if (r == null) return null;
+  return Math.round(r * Math.pow(10, RATING.decimals));
+}
+
+/* 把榜单上的整数还原成「4.8523」这种显示文本 */
+function formatRating(v) {
+  return (v / Math.pow(10, RATING.decimals)).toFixed(RATING.decimals);
+}
+
+/* 顶栏那一行的评分文本(外卖软件那种) */
+function ratingHeaderText() {
+  const r = shopRating();
+  if (r == null) return '暂无评分';
+  return '评分 ' + r.toFixed(RATING.decimals);
+}
+
+/* 还差几位客人才能上榜 */
+function ratingNeedMore() {
+  return Math.max(0, RATING.minCount + 1 - (shop.ratingCount || 0));
+}
+
 /* 按权重随机客人(随着天数推移, 可能出现的客人更多) */
 function randomCustomer(day) {
   const pool = CUSTOMERS.filter((c) => c.kind !== 'special' && (c.minDay == null || c.minDay <= day));
@@ -141,6 +175,9 @@ function makeCustomer(custDef, day) {
   if (custDef.kind === 'special') patience *= DAY.specialPatience;
   if (custDef.harass) patience *= 2.2; // 找茬的: 给足时间让玩家点走他
   patience = Math.round(patience);
+  /* 找茬的刘华强: 耐心无限(只能靠驯服的耄耋赶走) */
+  const endless = !!custDef.harass;
+  if (endless) patience = Infinity;
 
   return {
     def: custDef,
@@ -177,6 +214,8 @@ function spawnCustomer() {
   c.dispSlot = waiting;
   c.targetSlot = waiting;
   run.customers.push(c);
+  /* 客人自带的音效(如史蒂夫每提一次要求播一次) */
+  if (c.def && c.def.sound && typeof playSound === 'function') playSound(c.def.sound);
   return c;
 }
 
@@ -186,7 +225,10 @@ function updateCustomers(dt) {
   for (const c of run.customers) {
     if (c.state !== 'waiting') continue;
     if (c.enterT < 1) c.enterT = Math.min(1, c.enterT + dt * 3);
-    c.patienceLeft -= dt;
+    /* 月兔安抚: 有效期间耐心掉得更慢 */
+    const calm = (c.calmT || 0) > 0 ? (c.calmRate || 0) : 0;
+    if (isFinite(c.patienceLeft)) c.patienceLeft -= dt * Math.max(0.05, 1 - calm); // 无限耐心不衰减
+    if (c.calmT > 0) c.calmT -= dt;
     c.bob += dt * 2.4;
     if (c.patienceLeft <= 0) {
       c.patienceLeft = 0;
@@ -202,7 +244,9 @@ function onCustomerLost(customer) {
   run.dayLost += 1;
   run.combo = 0;
   shop.coins = Math.max(0, shop.coins - DAY.leaveCoinPenalty);
-  shop.reputation = Math.max(0, shop.reputation - DAY.leaveRepPenalty);
+  /* 跑单 = 一条差评(0 星), 评分自然被拉低 */
+  shop.ratingSum = (shop.ratingSum || 0) + 0;
+  shop.ratingCount = (shop.ratingCount || 0) + 1;
   shop.stats.failed += 1;
   SFX.fail();
   addShake(7);
@@ -275,13 +319,15 @@ function serveCustomer(customer, moon) {
   const perfect = r.score >= 0.9;
 
   customer.state = 'served';
+  SFX.eat(); // 客人开吃
 
   const qty = 1;
   const bonus = moonValue(moon); // 皮+馅 的价值(含特殊功能)
-  /* 馅料品质: 按「产出该馅料的工厂」加权, 提高出餐金币与口碑 */
+  /* 馅料品质: 按「产出该馅料的工厂」加权, 提高出餐金币 */
   const q = moonQuality(moon);
   let coins = (customer.def.reward + bonus) * qty * (0.5 + r.score) * q.price;
   if (customer.def.kind === 'special') coins *= DAY.specialReward;
+  if (customer.def.coinMul > 1) coins *= customer.def.coinMul; // 良子: 工钱翻倍
   if (perfect) {
     run.combo = Math.min(run.combo + 1, 5); // 连击有上限, 免得金币滚雪球
     coins += 12 + run.combo * 6;
@@ -301,15 +347,16 @@ function serveCustomer(customer, moon) {
   customer.wrongPenalty = penalty;
 
   /* 金币不直接入账: 由 shop 场景把钱撒到柜台上, 玩家点击捡起才结算 */
-  const repGain = stars + q.rep; // 品质越高, 口碑涨得越多
-  shop.reputation += repGain;
-  shop.totalStars += repGain;
   shop.stats.served += 1;
   run.dayServed += 1;
   if (perfect) shop.stats.perfect += 1;
 
   const scorePct = Math.round(r.score * 100);
   if (scorePct > shop.bestScore) shop.bestScore = scorePct;
+
+  /* 店铺评分(外卖式): 这次出餐的得分折算成 0~5 星, 累加进平均分 */
+  shop.ratingSum = (shop.ratingSum || 0) + r.score * RATING.stars;
+  shop.ratingCount = (shop.ratingCount || 0) + 1;
 
   /* 特殊客人奖励: 道具 + 组件掉落 */
   const rewards = [];
@@ -326,21 +373,31 @@ function serveCustomer(customer, moon) {
     }
   }
   if (rewards.length) {
-    showScreenText('获得 ' + rewards.join(' + '), '去工厂装上试试', COLORS.gold);
+    showScreenText('获得 ' + rewards.join(' + '), '', COLORS.gold);
     SFX.unlock();
   }
 
-  /* 特殊客人效果: 月兔 -> 恢复所有客人的耐心 */
-  if (customer.def.onServe === 'restorePatience') {
-    for (const c of run.customers) {
-      if (c.state === 'waiting') c.patienceLeft = c.patienceMax;
+  /* 特殊客人效果(可以挂多条):
+   *   restorePatience 月兔 -> 恢复所有客人耐心
+   *   rabbitGift      月兔 -> 有几率送一只月兔 / 给现有月兔升 1 级
+   *   freeUpgrade     史蒂夫 -> 随机白送一项升级(月兔除外) */
+  const onServe = customer.def.onServe;
+  const effects = Array.isArray(onServe) ? onServe : (onServe ? [onServe] : []);
+  for (const eff of effects) {
+    if (eff === 'restorePatience') {
+      for (const c of run.customers) {
+        if (c.state === 'waiting') c.patienceLeft = c.patienceMax;
+      }
+      showScreenText('月兔的祝福', '所有客人的耐心已恢复', COLORS.ok);
+      SFX.unlock();
+    } else if (eff === 'rabbitGift') {
+      rabbitGift();
+    } else if (eff === 'freeUpgrade') {
+      freeUpgradeGift();
     }
-    showScreenText('月兔的祝福', '所有客人的耐心已恢复', COLORS.ok);
-    SFX.unlock();
   }
 
-  if (perfect) addFloater('完美! x' + run.combo, 900, 262, COLORS.ok, 1.6);
-  if (penalty > 0) addFloater('粗心 -' + Math.round(penalty * 100) + '%', 900, 300, COLORS.fail, 1.5);
+  /* (评分飘字已按需求去掉, 评分本身照常算) */
 
   return { score: r.score, stars, coins, perfect, bonus, parts: r };
 }

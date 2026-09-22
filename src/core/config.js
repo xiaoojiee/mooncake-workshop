@@ -141,10 +141,13 @@ const FILLING_STACK = {
 };
 
 /* ---- B站信息(接入后按需修改) ---- */
-const TOY_BVID = 'BV1XwtB6YECv'; // 绑定的视频 BV 号
+const TOY_BVID = 'BV1FndsBGEk8'; // 绑定的视频 BV 号
 const TOY_AUTHOR_UID = '137429365'; // UP 主 uid
 const TOY_AUTHOR_NAME = '火山哥哥'; // 作者名兜底
 const TOY_VIDEO_TITLE = '月饼工坊'; // 视频标题兜底
+/* 头像/封面兜底: 端内会自动从 SDK/接口拿, 这两项留空即可(填了就是站外也有图) */
+const TOY_AUTHOR_FACE = '';
+const TOY_VIDEO_COVER = '';
 
 /* ---- 排行榜榜位 ---- */
 const BOARD = {
@@ -153,15 +156,16 @@ const BOARD = {
   rep: 3, // 累计口碑榜
 };
 
-/* ---- 互动解锁 ----
- * 用点赞/投币/收藏/关注解锁限定内容(端内端外均支持, 不弹数据确认)
- * 注: 当前食材表暂未挂互动解锁项, 预留给后续限定食材 */
-const UNLOCKS = {
-  liked: { name: '月兔印饼皮', label: '点赞解锁' },
-  coin: { name: '玉盘纹馅料', label: '投币解锁' },
-  fav: { name: '咸蛋黄流心', label: '收藏解锁' },
-  following: { name: '冰皮', label: '关注解锁' },
+/* ---- B站互动奖励(每项只发一次) ----
+ * 参照 demo1: 点赞送启动材料 / 投币送金币 / 收藏送通用组件 / 关注送一只月兔
+ * (端内端外都支持, 不弹数据确认) */
+const TOY_REWARDS = {
+  liked: { label: '点赞', text: '启动材料各5份' },
+  coin: { label: '投币', text: '500 金币' },
+  fav: { label: '收藏', text: '通用组件×2' },
+  following: { label: '关注', text: '月兔×1' },
 };
+const TOY_REWARD = { mats: 5, coins: 500, comps: 2 };
 
 /* ---- 游戏节奏(多客人并发) ---- */
 const DAY = {
@@ -185,9 +189,10 @@ const DAY = {
   maxOnScreen: 6,
   /* 耐心耗尽离开的惩罚 */
   leaveCoinPenalty: 15,
-  leaveRepPenalty: 2,
 
-  specialChance: 0.12, // 特殊客人出现概率(在有资格的特殊客人里随机抽)
+
+  rabbitGiftChance: 0.7, // 月兔客人送谢礼(送一只月兔/升一级)的几率
+  specialChance: 0.22, // 特殊客人出现概率(在有资格的特殊客人里随机抽)
   /* 五金月饼砸人 */
   smashRepPenalty: 5, // 砸普通客人掉的口碑(砸找茬的不掉)
   smashShake: 12,
@@ -216,17 +221,18 @@ const MONEY = {
  * 电量不够时, 离核心近的工厂优先通电, 最远的断电
  * coreCost: 升到下一级的花费(下标 = 当前等级-1) */
 const CORE = {
-  maxLevel: 5,
-  capacity: [3, 5, 7, 10, 14], // 各等级总电量
-  cost: [500, 1100, 2200, 4000], // 1→2, 2→3, 3→4, 4→5
+  maxLevel: 7,
+  capacity: [3, 5, 7, 10, 14, 18, 22], // 各等级总电量
+  cost: [500, 1100, 2200, 4000, 7000, 12000], // 1→2, 2→3, 3→4, 4→5
 };
 
 /* ---- 工厂生产(进度条 → 掉落产物) ----
  * 通电工厂按 speed 累积进度, 进度满 1 生成一个产物(掉落状态)
  * 工厂旁边堆到 maxDrops 个未捡产物就停产 */
 const PRODUCE = {
-  maxDrops: 3, // 单个工厂最多堆几个待捡产物
-  dropValue: 1, // 一个产物 = 几份原料进背包
+  maxDrops: 3, // 工厂旁最多堆几个未捡产物
+  dropValue: 1, // 一个产物 = 几个原料价值
+  speedMulCap: 8, // 组件堆速度的上限倍率(免得后期产速爆炸)
 };
 
 /* ---- 开门前备货 ----
@@ -241,21 +247,83 @@ const STOCKING = {
 /* ---- 柜台升级(在工厂管理页购买) ----
  *   boiler 锅炉   : 提升烤炉效率(缩短烘烤时间, 延后烤糊)
  *   tray   托盘   : 制作台托盘位 +1(最多到 slots)
- *   cart   收银小车: 柜台上来回移动, 自动捡起沿途金币
+ *   (收银小车 / 自动装配 / 自动烤制 已由「月兔」取代, 见 RABBIT)
  */
-const COUNTER_LABEL = { tray: '制作台数量', boiler: '烤炉速度', cart: '收银小车', auto: '自动装配速度', autoBake: '自动烤制' };
+const COUNTER_LABEL = { tray: '制作台数量', boiler: '烤炉速度' };
 const COUNTER = {
   /* 制作台数量: 1 个起, 最多加到 tray.slots 个 */
   tray: { max: 3, slots: 4, cost: [375, 875, 1750] },
   /* 烤炉速度: 缩短烘烤时间 / 延后烤糊 */
-  boiler: { max: 3, bakeFactor: 0.12, burnFactor: 0.18, cost: [325, 700, 1225] },
-  /* 收银小车: 柜台上来回移动自动捡金币 */
-  cart: { max: 2, speed: [170, 300], radius: [44, 62], cost: [375, 800] },
-  /* 制作台自动化: 自动从背包取皮+馅, 按客人订单填满空托盘
-   * interval[lv-1] = 该等级的「每步间隔」(秒), 越小越快 */
-  auto: { max: 3, interval: [3.0, 2.2, 1.6], cost: [1500, 1200, 1600] },
-  /* 自动烤制: 自动装配好的月饼自动送进空烤位 */
-  autoBake: { max: 1, cost: [2400] },
+  boiler: { max: 6, bakeFactor: 0.12, burnFactor: 0.18, cost: [325, 700, 1225, 2100, 3200, 4600] },
+};
+
+/* ---- 月兔 ----
+ * 花金币买月兔(可多只), 它们在店里四处跑; 每只的 6 项能力各自独立升级:
+ *   calm    安抚: 碰到客人 -> 那位客人耐心暂时掉得更慢
+ *   speed   速度: 跑得更快
+ *   cashier 收银: 自动捡柜台上的金币
+ *   cook    做月饼: 用背包里的料填好一个空托盘
+ *   bake    入炉: 把做好的月饼送进烤炉
+ *   serve   送餐: 把烤好的月饼送给客人
+ *   fix     纠错: 托盘上的月饼做错了 -> 跑过去把不对的馅料拿走(退回背包)
+ * 数值: base + per × 等级 (cook/bake/serve/fix 是「间隔秒」, 越小越快) */
+const RABBIT = {
+  max: 4, // 最多同时养几只
+  buyCost: [800, 1800, 3600, 7000], // 第 N 只的购买价
+  costMul: 1.9, // 能力每升 1 级, 花费 ×1.9
+  roam: { x0: 36, x1: VW - 36, y0: 100, y1: VH - 26 }, // 活动范围: 全屏到处跑
+  /* 休息(没事干)溜达时的范围: 别钻进底栏/原料架里, 会被面板压住像卡住了 */
+  restRoam: { x0: 36, x1: VW - 36, y0: 96, y1: LAYOUT.bottomY - 26 },
+  touch: { x: 46, y: 60 }, // 判定「碰到客人」的横向/纵向距离
+  arrive: 10, // 走到目标的判定半径(px)
+  calmTime: 0.7, // 安抚效果持续时间(秒)
+  bodyH: 99, // 场上月兔的绘制高度(比原来大 1.5 倍)
+  /* 宽裕(没正事可干)的月兔会主动在客人之间来回移动, 维持耐心 */
+  calmBelow: 0.72, // 客人耐心掉到「最大耐心的这个比例」以下就算告急
+  calmMax: 2, // 最多同时派 2 只月兔去巡逻安抚
+  calmHold: 3.2, // 在一位客人身边守这么久(秒), 再换下一位
+  abil: {
+    calm: { label: '安抚', tip: '碰到客人, 他的耐心掉得更慢; 闲下来会主动在客人之间巡逻', max: 4, cost: 400, base: 0.35, per: 0.15 },
+    speed: { label: '速度', tip: '月兔跑得更快', max: 4, cost: 350, base: 70, per: 30 },
+    cashier: { label: '收银', tip: '自动捡起柜台上的金币', max: 3, cost: 500, base: 60, per: 34 },
+    cook: { label: '做月饼', tip: '用背包的料填好一个空托盘', max: 3, cost: 700, base: 5.0, per: -1.1 },
+    bake: { label: '入炉', tip: '把做好的月饼送进烤炉', max: 1, cost: 1200, base: 2.6, per: 0 },
+    serve: { label: '送餐', tip: '把烤好的月饼送给客人', max: 1, cost: 1400, base: 2.6, per: 0 },
+    fix: { label: '纠错', tip: '托盘上做错了 -> 跑去把不对的馅料拿走', max: 3, cost: 600, base: 5.0, per: -1.1 },
+  },
+};
+/* 月亮能力展示用: 当前等级下的数值 */
+function rabbitAbilValue(key, level) {
+  const a = RABBIT.abil[key];
+  if (!a) return 0;
+  return a.base + a.per * level;
+}
+
+/* ---- 流浪猫「耄耋」----
+ * 第 CAT.fromDay 天起出现, 在店里捣乱:
+ *   随机扑咬客人(客人当场没了, 算流失) / 偷吃烤炉里没烤好的月饼 / 偷吃快捷栏的材料
+ *   干坏事要「跑到对应位置」, 吃东西时冒粒子(像 Minecraft) */
+const CAT = {
+  fromDay: 2, // 第几天开始出现
+  name: '耄耋',
+  speed: 128, // 跑动速度(px/s)
+  roam: { x0: 36, x1: VW - 36, y0: 100, y1: VH - 26 },
+  restRoam: { x0: 36, x1: VW - 36, y0: 96, y1: LAYOUT.bottomY - 26 }, // 溜达时别钻底栏
+  arrive: 12, // 走到目标的判定半径
+  attackChance: 0.22, // 挑活时「扑客人」的概率(其余去偷吃)
+  eatTime: 1.5, // 吃东西的时长(秒, 期间冒粒子)
+  restTime: 5.5, // 干完一件坏事歇多久
+  leaveChance: 0.8, // 每做一次坏事, 80% 概率溜走(溜了当天就不来了)
+  arriveMin: 12, // 每天随机「第几秒」溜进来(秒)
+  arriveMax: 95,
+  tameHits: 3, // 被打飞 3 次 -> 第二天再来就是驯服状态
+  tameCalm: 0.8, // 驯服后守着客人: 耐心下降速度 ×(1-0.8) = 0.2
+  tameCalmTime: 1.2, // 驯服安抚的余韵(秒)
+  tameHold: 2.4, // 驯服后在一位客人身边守多久再换人
+  tameReach: 96, // 驯服后「守在客人身边」的判定半径(px)
+  knockRep: 2, // 打飞一次给的口碑(小奖励)
+  body: '#6f6157', // 猫毛色
+  belly: '#d8cfc4', // 肚皮/口鼻
 };
 
 /* ---- 工厂 ---- */
@@ -264,6 +332,17 @@ const STOCK_START_RATIO = 0.5; // 开局库存占容量比例
 
 /* ---- 品质(全厂平均品质的作用) ----
  * 品质只升不降: 1 是基准; 每高 1 点 -> 出餐金币 +pricePerLevel, 口碑 +repPerLevel */
+/* ---- 店铺评分(外卖软件那种) ----
+ * 每次出餐按得分折算成 0~5 星, 榜单上是「平均星级」;
+ * 评价人数不够(≤ minCount)时没有分数, 不上榜。
+ * decimals: 榜单显示/上报保留几位小数。
+ *   注意: B站 submitScore 只收整数(上限 16,777,215), 所以 0~5 分最多 6 位小数(5,000,000) */
+const RATING = {
+  stars: 5, // 满分几星
+  decimals: 4, // 精确到小数点后几位(想更细就调大, 上限 6)
+  minCount: 20, // 超过这么多位客人评分才有分数
+};
+
 const QUALITY = {
   pricePerLevel: 0.3, // 每 1 点品质 -> 售价 +30%
   repPerLevel: 1, // 每 1 点品质 -> 口碑 +1(向下取整)
@@ -311,8 +390,8 @@ const ASSET_LIST = [
   /* 饼皮 3行(生面团/包好成品/摊开饼皮) x 4列(糖浆/奶黄/抹茶/巧克力) */
   { key: 'crust_sheet', src: 'assets/sprite/crust_sheet.png' },
   /* 馅料 各 2x2 */
-  { key: 'filling_a', src: 'assets/sprite/filling_a.png' }, // 五仁/莲蓉/豆沙/蛋黄
-  { key: 'filling_b', src: 'assets/sprite/filling_b.png' }, // 西瓜/螺丝/砖头/腐肉
+  /* 馅料: 一张 3×3 九宫格(中间格空) -> 8 种, 切图见 atlas.js 的 FILLING_SHEET_SPEC */
+  { key: 'filling_sheet', src: 'assets/sprite/馅料贴图.png' },
   /* 客人 2×2 四宫格立绘 */
   { key: 'npc_normal', src: 'assets/贴图/普通npc.png' }, // 普通顾客立绘(3×3, 中间格空)
   { key: 'npc_special', src: 'assets/贴图/特殊npc.png' }, // 特殊客人立绘(3×3, 中间格空)
@@ -320,53 +399,58 @@ const ASSET_LIST = [
   /* 图集/包(自动识别连通块切格, 不要求严格网格; 顺序见 core/assets.js 的 SHEET_SLICES)
    * 之后美术交付的贴图统一放 assets/贴图/ 下 */
   { key: 'ui_sheet', src: 'assets/贴图/ui新.png' },
-  { key: 'factory_icons', src: 'assets/贴图/工厂图标.png' },
-  { key: 'components_sheet', src: 'assets/贴图/组件.png' },
+  /* 注: 工厂图标 / 组件图标 不再用贴图 —— 改成程序化绘制(见 core/icons.js 的 drawIconArt)
+   * 想换回贴图: 把下面两行放开, 并在 assets.js 的 SHEET_SLICES 里恢复对应条目即可
+   * { key: 'factory_icons', src: 'assets/贴图/工厂图标.png' },
+   * { key: 'components_sheet', src: 'assets/贴图/组件.png' }, */
   { key: 'fx_sheet', src: 'assets/贴图/特效.png' },
   { key: 'mold_stamp_sheet', src: 'assets/贴图/道具.png' },
   { key: 'counter_sheet', src: 'assets/贴图/柜台.png' },
   { key: 'hardware_sheet', src: 'assets/贴图/五金.png' }, // 五金月饼(裁留白后存成 hardware_moon)
+  /* 月兔 4 色 / 流浪猫耄耋 / 猫爪印(裁留白后存成 rabbit_1..4 / cat / cat_paw) */
+  { key: 'rabbit1', src: 'assets/贴图/月兔1.png' },
+  { key: 'rabbit2', src: 'assets/贴图/月兔2.png' },
+  { key: 'rabbit3', src: 'assets/贴图/月兔3.png' },
+  { key: 'rabbit4', src: 'assets/贴图/月兔4.png' },
+  { key: 'cat_sheet', src: 'assets/贴图/耄耋.png' },
+  { key: 'cat_paw_sheet', src: 'assets/贴图/耄耋攻击.png' },
+  { key: 'interact_sheet', src: 'assets/贴图/互动贴图.png' }, // 互动入口图标(星星), 裁留白后存成 interact_icon
 
   /* 道具图标 */
-  { key: 'mold_stamp', src: 'assets/mask/mold_stamp.png' },
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'mold_stamp', src: 'assets/mask/mold_stamp.png' }, */
 
   /* 背景 */
   { key: 'bg_open', src: 'assets/贴图/开店.png' }, // 营业中(明亮)
   { key: 'bg_closed', src: 'assets/贴图/闭店.png' }, // 打烊/开始界面(昏暗)
-  { key: 'bg_shop', src: 'assets/bg/bg_shop.png' },
-  { key: 'bg_counter', src: 'assets/bg/bg_counter.png' },
-  { key: 'bg_factory', src: 'assets/bg/bg_factory.png' },
-  { key: 'bg_menu', src: 'assets/bg/bg_menu.png' },
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'bg_shop', src: 'assets/bg/bg_shop.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'bg_counter', src: 'assets/bg/bg_counter.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'bg_factory', src: 'assets/bg/bg_factory.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'bg_menu', src: 'assets/bg/bg_menu.png' }, */
 
   /* UI */
   /* 注: ui_panel/ui_button 等已改为程序化绘制; 只剩金币/托盘/锁三件用图集,
    * 由 assets/贴图/ui新.png 切出(见 assets.js 的 UI_SHEET_LITE), 不再单列 PNG */
 
   /* 工厂 */
-  { key: 'factory_crust', src: 'assets/factory/factory_crust.png' },
-  { key: 'factory_filling', src: 'assets/factory/factory_filling.png' },
-  { key: 'icon_speed', src: 'assets/factory/icon_speed.png' },
-  { key: 'icon_capacity', src: 'assets/factory/icon_capacity.png' },
-  { key: 'icon_quality', src: 'assets/factory/icon_quality.png' },
-  { key: 'icon_unlock', src: 'assets/factory/icon_unlock.png' },
+  /* 工厂/属性图标已改为程序化绘制, 这些单图占位不再加载(文件本来也不存在) */
 
   /* 组件图标 */
-  { key: 'comp_motor', src: 'assets/component/comp_motor.png' },
-  { key: 'comp_gear', src: 'assets/component/comp_gear.png' },
-  { key: 'comp_mold', src: 'assets/component/comp_mold.png' },
-  { key: 'comp_mixer', src: 'assets/component/comp_mixer.png' },
-  { key: 'comp_cooler', src: 'assets/component/comp_cooler.png' },
-  { key: 'comp_moon', src: 'assets/component/comp_moon.png' },
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_motor', src: 'assets/component/comp_motor.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_gear', src: 'assets/component/comp_gear.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_mold', src: 'assets/component/comp_mold.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_mixer', src: 'assets/component/comp_mixer.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_cooler', src: 'assets/component/comp_cooler.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_moon', src: 'assets/component/comp_moon.png' }, */
   /* 梗组件 */
-  { key: 'comp_melon', src: 'assets/component/comp_melon.png' }, // 西瓜刀
-  { key: 'comp_nut', src: 'assets/component/comp_nut.png' }, // 螺母馅压机
-  { key: 'comp_kiln', src: 'assets/component/comp_kiln.png' }, // 高温窑炉
-  { key: 'comp_spawner', src: 'assets/component/comp_spawner.png' }, // 僵尸刷怪笼
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_melon', src: 'assets/component/comp_melon.png' }, // 西瓜刀 */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_nut', src: 'assets/component/comp_nut.png' }, // 螺母馅压机 */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_kiln', src: 'assets/component/comp_kiln.png' }, // 高温窑炉 */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'comp_spawner', src: 'assets/component/comp_spawner.png' }, // 僵尸刷怪笼 */
 
   /* 特效 */
-  { key: 'fx_sparkle', src: 'assets/fx/fx_sparkle.png' },
-  { key: 'fx_steam', src: 'assets/fx/fx_steam.png' },
-  { key: 'fx_success', src: 'assets/fx/fx_success.png' },
-  { key: 'fx_fail', src: 'assets/fx/fx_fail.png' },
-  { key: 'fx_coin', src: 'assets/fx/fx_coin.png' },
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'fx_sparkle', src: 'assets/fx/fx_sparkle.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'fx_steam', src: 'assets/fx/fx_steam.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'fx_success', src: 'assets/fx/fx_success.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'fx_fail', src: 'assets/fx/fx_fail.png' }, */
+  /* (空壳占位, 文件不存在, 代码有兜底) { key: 'fx_coin', src: 'assets/fx/fx_coin.png' }, */
 ];

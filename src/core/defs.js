@@ -4,7 +4,7 @@
  *
  * 素材与图集(sprite sheet)的对应关系见 src/core/atlas.js:
  *   饼皮 = crust_sheet.png  3行(生面团/包好成品/摊开饼皮) x 4列(4 种饼皮)
- *   馅料 = filling_a.png / filling_b.png 各 2x2, 共 8 种
+ *   馅料 = 馅料贴图.png 3x3(中间格空), 共 8 种
  *   客人 = npc.png  上排 3 人 + 下排 2 人, 共 5 位
  *
  * 解锁体系(混合):
@@ -69,7 +69,7 @@ const FILLINGS = [
   },
   {
     id: 'lianrong', name: '莲蓉', index: 1, color: '#c9b98d', factory: 'factory_filling_lianrong',
-    value: 5, effect: 'lotus', effectText: '层数越多越值钱（每层×本月饼层数）', unlock: null,
+    value: 5, effect: 'lotus', effectText: '层数越多越值钱', unlock: null,
   },
   {
     id: 'dousha', name: '豆沙', index: 2, color: '#5e3a26', factory: 'factory_filling_dousha',
@@ -114,7 +114,7 @@ const HARDWARE = [
   {
     id: 'hardware_moon', name: '五金月饼', color: '#b9c0c7', icon: '🔩',
     factory: 'factory_hardware', value: 0,
-    effectText: '选中后点客人: 砸飞他（普通客人会掉口碑，找茬的不掉）',
+    effectText: '选中后点客人: 砸飞他',
   },
 ];
 
@@ -172,11 +172,11 @@ const COMPONENT_TYPES = [
   /* ---- 普通组件: 通用, 可购买 ---- */
   {
     id: 'motor', name: '动力马达', icon: 'comp_motor', type: 'normal', buyable: true, factoryId: null,
-    desc: '提升产线速度', effect: { speed: 1.8 }, cost: 140, upgradable: true, maxLevel: 5,
+    desc: '提升产线速度', effect: { speed: 0.6 }, cost: 140, upgradable: true, maxLevel: 5,
   },
   {
     id: 'gear', name: '传动齿轮', icon: 'comp_gear', type: 'normal', buyable: true, factoryId: null,
-    desc: '速度与品质兼顾', effect: { speed: 1.2, quality: 0.3 }, cost: 200, upgradable: true, maxLevel: 5,
+    desc: '速度与品质兼顾', effect: { speed: 0.4, quality: 0.3 }, cost: 200, upgradable: true, maxLevel: 5,
   },
   {
     id: 'cooler', name: '冷凝管', icon: 'comp_cooler', type: 'normal', buyable: true, factoryId: null,
@@ -188,12 +188,12 @@ const COMPONENT_TYPES = [
   },
   {
     id: 'mixer', name: '搅拌桨', icon: 'comp_mixer', type: 'normal', buyable: true, factoryId: null,
-    desc: '速度与产出兼顾', effect: { speed: 1.0, yield: 1 }, cost: 360, upgradable: true, maxLevel: 3,
+    desc: '速度与产能兼顾', effect: { speed: 0.35, yield: 0.5 }, cost: 360, upgradable: true, maxLevel: 3,
   },
   /* ---- 通用特殊: 任何工厂可装, 但只能掉落 ---- */
   {
     id: 'moonstone', name: '月光石', icon: 'comp_moon', type: 'special', buyable: false, factoryId: null,
-    desc: '嫦娥掉落。大幅提升速度与品质（通用特殊）', effect: { speed: 3, quality: 1.5 }, cost: 0, upgradable: false, maxLevel: 1,
+    desc: '嫦娥掉落。大幅提升速度与品质', effect: { speed: 1.2, quality: 1.5 }, cost: 0, upgradable: false, maxLevel: 1,
   },
   /* ---- 专属特殊: 只能装在指定工厂, 装上解锁对应梗食材 ---- */
   {
@@ -227,9 +227,9 @@ function componentEffectText(def) {
   if (!def || !def.effect) return '—';
   const e = def.effect;
   const parts = [];
-  if (e.speed) parts.push('速度+' + e.speed);
+  if (e.speed) parts.push('速度+' + Math.round(e.speed * 100) + '%');
   if (e.quality) parts.push('品质+' + e.quality);
-  if (e.yield) parts.push('产出+' + e.yield);
+  if (e.yield) parts.push('产能+' + Math.round(e.yield * 100) + '%');
   if (e.unlock) {
     const f = findFillingDef(e.unlock);
     parts.push('解锁' + (f ? f.name : e.unlock));
@@ -261,11 +261,13 @@ function componentUpgradeCost(compDef, level) {
   return Math.round(compDef.cost * 0.8 * Math.pow(1.6, level - 1));
 }
 
-/* 把工厂槽位合成为运行数值 */
+/* 把工厂槽位合成为运行数值
+ * 注意: 组件的 speed / yield 是「倍率加成」(0.6 = +60%), 不是绝对值 ——
+ * 早期写成「baseSpeed + speed」会让一个马达把产速抬十几倍, 直接打穿经济 */
 function computeFactoryStats(base, factory) {
-  let speed = 0;
+  let speedMul = 0;
   let quality = 0;
-  let yieldBonus = 0;
+  let yieldMul = 0;
   const unlocks = [];
   for (const slot of factory.slots || []) {
     if (!slot) continue;
@@ -273,17 +275,18 @@ function computeFactoryStats(base, factory) {
     if (!def) continue;
     const lv = slot.level || 1;
     const e = def.effect;
-    if (e.speed) speed += e.speed * lv;
+    if (e.speed) speedMul += e.speed * lv;
     if (e.quality) quality += e.quality * lv;
-    if (e.yield) yieldBonus += e.yield * lv;
+    if (e.yield) yieldMul += e.yield * lv;
     if (e.unlock) unlocks.push(e.unlock);
   }
+  const cap = (typeof PRODUCE === 'object' && PRODUCE && PRODUCE.speedMulCap) || 8;
   return {
-    speed: base.baseSpeed + speed,
+    speed: speedMul, // 倍率加成(不含基准)
     quality: base.baseQuality + quality,
-    yieldBonus,
+    yieldBonus: yieldMul, // 产能倍率加成
     unlocks,
-    finalSpeed: Math.min(30, base.baseSpeed + speed),
+    finalSpeed: base.baseSpeed * Math.min(1 + speedMul, cap),
   };
 }
 
@@ -346,17 +349,20 @@ const CUSTOMERS = [
   },
   {
     id: 'c8', kind: 'special', name: '良子', npcIndex: 0, reward: 70, minDay: 3,
-    order: { kind: 'tripleRot' },
+    order: { kind: 'tripleRot' }, coinMul: 2, // 料放三倍, 钱也翻倍
     quip: '料给我放三倍，有腐肉就全上腐肉',
   },
   {
     id: 'c9', kind: 'special', name: '月兔', npcIndex: 3, npcRandom: [4, 7], reward: 75, minDay: 4,
-    order: { kind: 'moonRabbit' }, onServe: 'restorePatience',
+    order: { kind: 'moonRabbit' },
+    onServe: ['restorePatience', 'rabbitGift'], // 恢复大家耐心 + 有几率送/升级月兔
     quip: '捣药捣累了…来块月饼，大家都歇会儿',
   },
   {
     id: 'c10', kind: 'special', name: '史蒂夫', npcIndex: 2, reward: 65, minDay: 3,
     order: { kind: 'rotOnly' },
+    onServe: ['freeUpgrade'], // 随机白送一项升级(工厂/工作台/烤炉…月兔除外)
+    sound: 'steve', // 每提一次要求播一次 史蒂夫.mp3
     quip: '腐肉，只要腐肉',
   },
 ];
@@ -427,7 +433,7 @@ function hasComponentInstalled(compId) {
 
 function unlockLabel(content) {
   if (!content || !content.factory) return '已解锁';
-  if (hasFactoryDeployed(content.factory)) return '已解锁（工坊已上场）';
+  if (hasFactoryDeployed(content.factory)) return '已解锁';
   const def = findFactoryDef(content.factory);
   return '上场「' + (def ? def.name : content.factory) + '」后可用';
 }

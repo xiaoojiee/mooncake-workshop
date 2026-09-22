@@ -8,9 +8,11 @@
 const shop = {
   day: 1,
   coins: 200,
-  reputation: 0, // 口碑, 影响客流
-  bestScore: 0, // 单笔最佳评分(榜位 2)
-  totalStars: 0, // 累计星级
+
+  bestScore: 0, // 单笔最佳评分
+  toyRewards: {}, // B站互动奖励领取记录 { liked/coin/fav/following: true }
+  ratingSum: 0, // 店铺评分累计(每次出餐折算成 0~5 星累加)
+  ratingCount: 0, // 已评分客人数(超过 RATING.minCount 才上榜)
   units: {}, // 已上场的工厂实例 { uid: unit }
   factoryBag: {}, // 工厂仓库: { factoryId: 张数 }
   nextUnitId: 1, // 工厂实例自增 id
@@ -18,9 +20,13 @@ const shop = {
   components: {}, // 组件仓库: { compId 数量 }
   ovenLevel: 1, // 烤位等级(决定 run.oven 数量)
   coreLevel: 1, // 能源核心等级(决定总电量)
-  autoSlots: [], // 已升级为「自动」的制作台槽位下标
   welcomeGift: false, // 是否已发过开局启动材料(每档只发一次)
-  counter: { boiler: 0, tray: 0, cart: 0, autoBake: 0 }, // 柜台升级等级
+  lastMenu: null, // 上次确认的今日菜单 { crusts:[], fillings:[] }, 下次默认勾上
+  counter: { boiler: 0, tray: 0 }, // 柜台升级等级
+  rabbits: [], // 月兔 [{ art, x, y, abil:{calm,speed,cashier,cook,bake,serve} }]
+  cat: null, // 流浪猫耄耋(运行时对象, 不存档)
+  catHits: 0, // 耄耋被打飞的累计次数(够 3 次就驯服)
+  catTamed: false, // 耄耋是否已被驯服(第二天起会来帮忙)
   items: [], // 持有的特殊道具
   stats: {
     served: 0,
@@ -46,11 +52,11 @@ const run = {
   factoryOpen: false, // 工厂面板是否打开(不暂停游戏)
   money: [], // 撒在柜台上的金币 [{ x,y,vx,vy,value,life,rest,spin }]
   plates: [], // 摆到柜台上的烤好月饼 [{ moon, x, y }] (先把烤位腾出来)
-  cart: { x: 640, dir: 1 }, // 收银小车的位置/方向(柜台升级解锁后生效)
   powerOn: false, // 是否开业通电(只有营业中为 true, 工厂才生产)
   pendingPlan: null, // (旧)备货时预生成的今日客人计划
   orderPool: null, // 今日菜单: { crusts:[id], fillings:[id] }, 顾客只点这些
   dayTimeLeft: 0, // 今日剩余营业时间(秒)
+  catArriveT: 0, // 流浪猫「耄耋」今天还要多久才溜进来(每天只随机来一次)
 };
 
 /* 场景系统 */
@@ -175,8 +181,11 @@ function chromeVisible() {
 }
 function handlePointerDown(x, y) {
   if (chromeVisible()) {
+    if (typeof interactEntryDown === 'function' && interactEntryDown(x, y)) return;
+    if (typeof interactHandleDown === 'function' && interactHandleDown(x, y)) return;
     if (typeof benchUpgradeHandleDown === 'function' && benchUpgradeHandleDown(x, y)) return;
-    if (typeof stockingHandleDown === 'function' && stockingHandleDown(x, y)) return;
+    if (typeof rabbitHandleDown === 'function' && rabbitHandleDown(x, y)) return;
+  if (typeof stockingHandleDown === 'function' && stockingHandleDown(x, y)) return;
     if (typeof backpackHandleDown === 'function' && backpackHandleDown(x, y)) return;
     if (typeof debugHandleDown === 'function' && debugHandleDown(x, y)) return;
   }
@@ -185,8 +194,10 @@ function handlePointerDown(x, y) {
 }
 function handlePointerMove(x, y) {
   if (chromeVisible()) {
+    if (typeof interactHandleMove === 'function' && interactHandleMove(x, y)) return;
     if (typeof benchUpgradeHandleMove === 'function' && benchUpgradeHandleMove(x, y)) return;
-    if (typeof stockingHandleMove === 'function' && stockingHandleMove(x, y)) return;
+    if (typeof rabbitHandleMove === 'function' && rabbitHandleMove(x, y)) return;
+  if (typeof stockingHandleMove === 'function' && stockingHandleMove(x, y)) return;
     if (typeof backpackHandleMove === 'function' && backpackHandleMove(x, y)) return;
   }
   const s = scenes.current;
@@ -195,7 +206,8 @@ function handlePointerMove(x, y) {
 function handlePointerUp(x, y) {
   if (chromeVisible()) {
     if (typeof benchUpgradeHandleUp === 'function' && benchUpgradeHandleUp(x, y)) return;
-    if (typeof stockingHandleUp === 'function' && stockingHandleUp(x, y)) return;
+    if (typeof rabbitHandleUp === 'function' && rabbitHandleUp(x, y)) return;
+  if (typeof stockingHandleUp === 'function' && stockingHandleUp(x, y)) return;
     if (typeof backpackHandleUp === 'function' && backpackHandleUp(x, y)) return;
   }
   const s = scenes.current;
@@ -204,7 +216,8 @@ function handlePointerUp(x, y) {
 function handleWheel(x, y, delta) {
   if (chromeVisible()) {
     if (typeof benchUpgradeHandleWheel === 'function' && benchUpgradeHandleWheel(x, y, delta)) return;
-    if (typeof stockingHandleWheel === 'function' && stockingHandleWheel(x, y, delta)) return;
+    if (typeof rabbitHandleWheel === 'function' && rabbitHandleWheel(x, y, delta)) return;
+  if (typeof stockingHandleWheel === 'function' && stockingHandleWheel(x, y, delta)) return;
     if (typeof backpackHandleWheel === 'function' && backpackHandleWheel(x, y, delta)) return;
   }
   const s = scenes.current;

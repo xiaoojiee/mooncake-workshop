@@ -1,13 +1,13 @@
 'use strict';
 
-/* 制作台升级浮层: 制作台数量 / 烤炉数量 / 烤炉速度 / 收银小车 / 制作台自动化
+/* 制作台升级浮层: 制作台数量 / 烤炉速度 / 月兔入口
  * 全局浮层: 开始界面与营业中都能打开, 营业中打开不打断当天
  * 由 state.js 指针分发最优先拦截, main.js 统一绘制 */
 
 /* global W, H, COLORS, shop, run, OVEN, COUNTER, COUNTER_LABEL, benchSlotCount, counterLevel,
    counterUpgradeCost, applyCounterUpgrade, upgradesFor, applyOvenUpgrade, formatNum,
    drawText, uiPanel, uiButton, pointInRect, fillRoundRect, strokeRoundRect, SFX,
-   showScreenText, slotAutoEnabled, slotAutoLevel, slotAutoCost, upgradeSlotAuto */
+   showScreenText */
 
 const benchUpgradeUI = { open: false, focus: null }; // focus: { kind:'bench'|'oven', index }
 
@@ -55,7 +55,7 @@ function benchUpgradeRows() {
   const oven = {
     id: 'oven', name: '烤炉数量',
     value: ovenLv + ' / ' + OVEN.maxSlots,
-    desc: '每级 +1 个烤位（烤位是真正的瓶颈）',
+    desc: '每级 +1 个烤位',
     cost: nextOven ? nextOven.cost : null,
     apply: () => (nextOven ? applyOvenUpgrade(nextOven.id) : false),
   };
@@ -66,35 +66,11 @@ function benchUpgradeRows() {
     cost: counterUpgradeCost('boiler'),
     apply: () => applyCounterUpgrade('boiler'),
   };
-  const cart = {
-    id: 'cart', name: '收银小车',
-    value: 'Lv.' + counterLevel('cart') + ' / ' + COUNTER.cart.max,
-    desc: '小车在柜台上来回移动，自动捡起金币',
-    cost: counterUpgradeCost('cart'),
-    apply: () => applyCounterUpgrade('cart'),
-  };
-  const lv = slot ? slotAutoLevel(benchIdx) : 0;
-  const auto = {
-    id: 'auto', name: '自动装配速度',
-    value: slot ? ('Lv.' + lv + ' / ' + COUNTER.auto.max) : '—',
-    desc: slot
-      ? '第 ' + (benchIdx + 1) + ' 个制作台自动取皮+馅组装；等级越高每步越快（第 1 级即开启）'
-      : '从营业画面「某个制作台」右上角的 ⬆ 进入，可指定要自动化的制作台',
-    cost: slot ? slotAutoCost(benchIdx) : null,
-    apply: () => (slot ? upgradeSlotAuto(benchIdx) : { ok: false, reason: '请从制作台槽位进入' }),
-  };
-  const autoBake = {
-    id: 'autoBake', name: '自动烤制',
-    value: counterLevel('autoBake') > 0 ? '已开启' : '未开启',
-    desc: '自动制作台装好的月饼，自动送进空闲烤位（出餐仍手动）',
-    cost: counterUpgradeCost('autoBake'),
-    apply: () => applyCounterUpgrade('autoBake'),
-  };
-
-  if (focus && focus.kind === 'bench') return [tray, auto];
-  if (focus && focus.kind === 'oven') return [oven, boiler, autoBake];
-  return [tray, oven, boiler, autoBake, cart, auto];
+  if (focus && focus.kind === 'bench') return [tray];
+  if (focus && focus.kind === 'oven') return [oven, boiler];
+  return [tray, oven, boiler];
 }
+
 
 /* ---- 指针分发(营业/开始界面都能用) ---- */
 function benchUpgradeHandleDown(x, y) {

@@ -14,7 +14,7 @@
 
 /* global COLORS, img, drawSprite, rgba, findCrustDef, findFillingDef, fillingColorOf,
    fillingIndexOf, drawCrustPart, drawFillingIcon, SCORE_WEIGHT, OVEN, fillRoundRect,
-   drawText, clamp, ovenBakeTime, ovenBurnTime, FILLING_STACK */
+   drawText, clamp, ovenBakeTime, ovenBurnTime, FILLING_STACK , SFX */
 
 /* ---- 制作台托盘 ---- */
 function createSlot() {
@@ -66,6 +66,7 @@ function ovenPut(ovenSlot, moon) {
   ovenSlot.moon = moon;
   ovenSlot.bake = 0;
   ovenSlot.state = 'baking';
+  if (typeof SFX !== 'undefined' && SFX.oven) SFX.oven(); // 月饼入炉开烤
   return { ok: true };
 }
 

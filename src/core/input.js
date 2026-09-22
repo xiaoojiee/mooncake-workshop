@@ -3,7 +3,7 @@
 /* 指针输入: 统一鼠标与触屏(Pointer Events), 换算为逻辑坐标
  * 触屏时判定容差放宽, 见 TOUCH_TOLERANCE */
 
-/* global screenToLogical, input, W, H */
+/* global screenToLogical, input, W, H , unlockAudio */
 
 let isTouchDevice = false;
 
@@ -36,14 +36,21 @@ function initInput() {
 
   canvas.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    /* 移动端: 首次按下解锁音频(浏览器要求手势内才能播) */
+    if (typeof unlockAudio === 'function') unlockAudio();
     onDown(e);
   });
   canvas.addEventListener('pointermove', onMove);
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('pointercancel', onUp);
-  canvas.addEventListener('pointerleave', () => {
+  /* 拖到画布外/窗口失焦: 必须补一次「松手」, 否则拖着的东西会一直粘着鼠标 */
+  const cancelDrag = () => {
+    if (!input.pointer.down) return;
     input.pointer.down = false;
-  });
+    if (typeof handlePointerUp === 'function') handlePointerUp(input.pointer.x, input.pointer.y);
+  };
+  canvas.addEventListener('pointerleave', cancelDrag);
+  window.addEventListener('blur', cancelDrag);
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   /* 滚轮: 转发给当前场景的 onWheel(逻辑坐标 + 归一化滚动量) */

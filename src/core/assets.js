@@ -3,7 +3,7 @@
 /* 材质加载: 核心素材必须加载完才 ready; 缺失素材自动降级为占位, 不阻塞流程
  * 全部素材为可选(P0 缺图也能进游戏), 但会记录缺失列表供调试 */
 
-/* global ASSET_LIST, ICON_SCALE, COLORS, fillRoundRect, roundRect, drawText */
+/* global ASSET_LIST, ICON_SCALE, COLORS, fillRoundRect, roundRect, drawText , drawIconArt */
 
 const IMG = {}; // key -> HTMLImageElement
 const ASSET_READY = {}; // key -> bool
@@ -97,11 +97,39 @@ const SHEET_SLICES = [
       { keys: UI_SHEET_FULL.map((m) => m.key) },
       { keys: UI_SHEET_LITE.map((m) => m.key) },
     ],
+    /* 固定包围盒: 1(宽面板) + 3 + 5 共 9 件
+     * 不靠 alpha 连通块识别 —— 浏览器解码 webp 后 alpha 会有细微差异, 数量对不上就整张不切 */
+    boxes: [
+      [0.0313, 0.0547, 0.9688, 0.4570], // ui_panel
+      [0.0342, 0.4883, 0.3564, 0.6543], // ui_card
+      [0.3857, 0.5117, 0.6699, 0.6338], // ui_button
+      [0.6973, 0.5176, 0.9600, 0.6279], // ui_button_active
+      [0.0254, 0.7148, 0.1748, 0.8701], // ui_coin
+      [0.1934, 0.7207, 0.3203, 0.8535], // ui_star
+      [0.3398, 0.6719, 0.5869, 0.9160], // ui_plate
+      [0.5928, 0.6777, 0.8115, 0.9043], // ui_box
+      [0.8350, 0.6914, 0.9707, 0.8799], // ui_lock
+    ],
   },
-  { key: 'components_sheet', keys: ['comp_motor', 'comp_gear', 'comp_cooler', 'comp_mold', 'comp_mixer', 'comp_moon', 'comp_melon', 'comp_nut', 'comp_kiln', 'comp_spawner'] },
-  /* 图标包: 小闪光/挂件分散 -> 按行等分 + 行内投影分列 */
-  { key: 'factory_icons', keys: ['factory_crust', 'factory_filling', 'icon_speed', 'icon_capacity', 'icon_quality', 'icon_unlock'], rows: 2 },
+  /* 组件图标 / 工厂图标: 已改成程序化绘制(见 core/icons.js), 不再从贴图切
+   * (要换回贴图: 放开 config.js 里对应 ASSET_LIST 两行 + 恢复这里的条目) */
   /* 特效: 大爆炸/金币带辉光粘连 -> 直接给固定比例框(相对宽高 0~1) */
+  {
+    /* 馅料: 图上是 3×3 排布但行高列宽都不均匀(还有螺丝这种两个零件), 
+     * 所以不用网格/连通块, 直接写死量好的归一化包围盒(顺序不变, 跳过中间格) */
+    key: 'filling_sheet',
+    keys: ['filling_0', 'filling_1', 'filling_2', 'filling_3', 'filling_4', 'filling_5', 'filling_6', 'filling_7'],
+    boxes: [
+      [0.1542, 0.1561, 0.3449, 0.3419], // 0 五仁
+      [0.4081, 0.1561, 0.5919, 0.3419], // 1 莲蓉
+      [0.6571, 0.1561, 0.8419, 0.3419], // 2 豆沙
+      [0.1454, 0.4121, 0.3517, 0.5869], // 3 蛋黄(这一格上下留白多, 单独收紧)
+      [0.6366, 0.3993, 0.8624, 0.5998], // 4 西瓜
+      [0.1346, 0.6600, 0.3634, 0.8390], // 5 螺丝
+      [0.3876, 0.6600, 0.6115, 0.8390], // 6 砖头
+      [0.6336, 0.6600, 0.8644, 0.8390], // 7 腐肉
+    ],
+  },
   {
     key: 'fx_sheet',
     keys: ['fx_sparkle', 'fx_steam', 'fx_success', 'fx_fail', 'fx_coin'],
@@ -205,6 +233,13 @@ const SINGLE_CROPS = [
   { key: 'mold_stamp_sheet', dst: 'mold_stamp' },
   { key: 'counter_sheet', dst: 'counter' },
   { key: 'hardware_sheet', dst: 'hardware_moon' }, // 五金月饼(整张一个元素)
+  { key: 'rabbit1', dst: 'rabbit_1' }, // 月兔 4 色
+  { key: 'rabbit2', dst: 'rabbit_2' },
+  { key: 'rabbit3', dst: 'rabbit_3' },
+  { key: 'rabbit4', dst: 'rabbit_4' },
+  { key: 'cat_sheet', dst: 'cat' }, // 流浪猫耄耋
+  { key: 'cat_paw_sheet', dst: 'cat_paw' }, // 猫爪印(扑咬特效)
+  { key: 'interact_sheet', dst: 'interact_icon' }, // 互动入口(星星)
 ];
 
 /* 通用切法: 不依赖网格 —— 扫出不透明「连通块」, 按 行->列 顺序对应 keys */
@@ -473,6 +508,10 @@ function drawSprite(g, key, x, y, w, h, fallbackColor) {
     const nw = w * k;
     const nh = h * k;
     g.drawImage(i, cx - nw / 2, cy - nh / 2, nw, nh);
+    return true;
+  }
+  /* 没贴图: 先试程序化图标(组件/工厂/属性), 再退回虚线占位框 */
+  if (typeof drawIconArt === 'function' && drawIconArt(g, key, x + w / 2, y + h / 2, Math.min(w, h) * (ICON_SCALE || 1))) {
     return true;
   }
   g.save();
